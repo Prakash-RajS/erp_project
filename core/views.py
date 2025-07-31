@@ -282,27 +282,33 @@ class RoleView(APIView):
 class RoleDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated, RoleBasedPermission]
 
-    def get(self, request):
-        page = int(request.query_params.get('page', 1))
-        per_page = int(request.query_params.get('per_page', 10))
+    def get(self, request, pk=None):
+        if pk:
+            try:
+                role = Role.objects.get(pk=pk)
+                serializer = RoleSerializer(role)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            except Role.DoesNotExist:
+                return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            page = int(request.query_params.get('page', 1))
+            per_page = int(request.query_params.get('per_page', 10))
+            department_id = request.query_params.get('department')
 
-        department_id = request.query_params.get('department')  # 👈
+            roles = Role.objects.all().order_by('id')
+            if department_id:
+                roles = roles.filter(department_id=department_id)
 
-        roles = Role.objects.all().order_by('id')
-        
-        if department_id:  # 👈 filter by department
-            roles = roles.filter(department_id=department_id)
+            paginator = Paginator(roles, per_page)
+            page_obj = paginator.get_page(page)
+            serializer = RoleSerializer(page_obj, many=True)
 
-        paginator = Paginator(roles, per_page)
-        page_obj = paginator.get_page(page)
-        serializer = RoleSerializer(page_obj, many=True)
-        
-        return Response({
-            'roles': serializer.data,
-            'total_pages': paginator.num_pages,
-            'current_page': page,
-            'total_entries': roles.count(),
-        }, status=status.HTTP_200_OK)
+            return Response({
+                'roles': serializer.data,
+                'total_pages': paginator.num_pages,
+                'current_page': page,
+                'total_entries': roles.count(),
+            }, status=status.HTTP_200_OK)
 
     def put(self, request, pk):
         try:

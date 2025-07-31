@@ -1,4 +1,4 @@
-// AddNewCandidate.jsx
+
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./addNewCandidate.css";
@@ -12,8 +12,46 @@ export default function AddNewCandidate() {
   const [error, setError] = useState(null);
   const [filteredRoleList, setFilteredRoleList] = useState([]);
   const [formData, setFormData] = useState({
-    // ... (unchanged formData state)
-    upload_documents: "",
+    employee_code: "",
+    first_name: "",
+    last_name: "",
+    department: "",
+    branch: "",
+    designation: "",
+    gender: "",
+    joining_date: "",
+    personal_number: "",
+    emergency_contact_number: "",
+    email: "",
+    aadhar_number: "",
+    pan_number: "",
+    status: "",
+    current_address: "",
+    highest_qualification: "",
+    previous_employer: "",
+    total_experience_year: "",
+    total_experience_month: "",
+    relevant_experience_year: "",
+    relevant_experience_month: "",
+    marital_status: "",
+    conveyance_allowance: "",
+    medical_allowance: "",
+    other_allowances: "",
+    bonus: "",
+    taxes: "",
+    pf: "",
+    esi: "",
+    gross_salary: "",
+    net_salary: "",
+    uan_number: "",
+    pf_number: "",
+    bank_name: "",
+    account_number: "",
+    ifsc_code: "",
+    asset: "",
+    asset_type: "",
+    laptop_company_name: "",
+    asset_id: "",
   });
 
   // Fetch candidate data for edit mode
@@ -54,10 +92,17 @@ export default function AddNewCandidate() {
             gross_salary: data.gross_salary ? putComma(data.gross_salary) : "",
             net_salary: data.net_salary ? putComma(data.net_salary) : "",
           };
+          delete formattedData.upload_documents;
           setFormData(formattedData);
-          // If upload_documents contains file paths, display them
+
+          // Handle existing files for display
           if (data.upload_documents) {
-            setFile(data.upload_documents.split(',').map(path => ({ name: path.split('/').pop() })));
+            setFile(
+              data.upload_documents.split(",").map((path) => ({
+                name: path.split("/").pop(),
+                path,
+              }))
+            );
           }
         } catch (err) {
           setError(err.response?.data?.error || "Failed to fetch candidate data");
@@ -112,14 +157,12 @@ export default function AddNewCandidate() {
 
   const handleFileChange = (event) => {
     const newFiles = Array.from(event.target.files);
-    console.log("Selected files:", newFiles.map(f => f.name));
-    // Prevent duplicate files by checking names
+    console.log("Selected files:", newFiles.map((f) => f.name));
     setFile((prevFiles) => {
-      const existingNames = new Set(prevFiles.map(f => f.name));
-      const uniqueNewFiles = newFiles.filter(f => !existingNames.has(f.name));
+      const existingNames = new Set(prevFiles.map((f) => f.name));
+      const uniqueNewFiles = newFiles.filter((f) => !existingNames.has(f.name));
       return [...prevFiles, ...uniqueNewFiles];
     });
-    // Reset the file input to prevent re-selecting the same files
     event.target.value = null;
   };
 
@@ -143,12 +186,21 @@ export default function AddNewCandidate() {
     try {
       const formDataToSend = new FormData();
 
+      // Append all form fields except upload_documents
       Object.keys(formData).forEach((key) => {
-        if (key !== "upload_documents" && formData[key] !== null && formData[key] !== undefined) {
+        if (formData[key] !== null && formData[key] !== undefined) {
           const value = [
-            "basics", "hra", "conveyance_allowance", "medical_allowance",
-            "other_allowances", "bonus", "taxes", "pf", "esi",
-            "gross_salary", "net_salary"
+            "basics",
+            "hra",
+            "conveyance_allowance",
+            "medical_allowance",
+            "other_allowances",
+            "bonus",
+            "taxes",
+            "pf",
+            "esi",
+            "gross_salary",
+            "net_salary",
           ].includes(key)
             ? cleanNumericValue(formData[key])
             : formData[key];
@@ -156,45 +208,43 @@ export default function AddNewCandidate() {
         }
       });
 
-      // Append files
-      if (file.length === 0) {
-        console.log("No files selected for upload");
-      } else {
-        file.forEach((f, index) => {
-          console.log(`Appending file ${index}: ${f.name}`);
-          formDataToSend.append('upload_documents', f);
-        });
+      // Append new files for upload_documents
+      const newFiles = file.filter((f) => f instanceof File);
+      console.log("Files being uploaded:", newFiles.map(f => f.name));
+      if (newFiles.length > 0) {
+        newFiles.forEach((f) => {
+  formDataToSend.append("upload_documents", f); // append only true File objects
+});
       }
 
       // Debug: Log FormData contents
       for (let [key, value] of formDataToSend.entries()) {
-        console.log(`FormData entry: ${key}=${typeof value === 'object' ? '[File]' : value}`);
+        console.log(`FormData entry: ${key}=${typeof value === "object" ? "[File]" : value}`);
       }
 
       const config = {
         headers: {
           Authorization: `Token ${token}`,
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
       };
 
       const response = candidateId
         ? await axios.put(
-          `http://127.0.0.1:8000/api/onboarding/${candidateId}/`,
-          formDataToSend,
-          config
-        )
+            `http://127.0.0.1:8000/api/onboarding/${candidateId}/`,
+            formDataToSend,
+            config
+          )
         : await axios.post(
-          "http://127.0.0.1:8000/api/onboarding/",
-          formDataToSend,
-          config
-        );
+            "http://127.0.0.1:8000/api/onboarding/",
+            formDataToSend,
+            config
+          );
 
-      alert(`Candidate ${candidateId ? 'updated' : 'added'} successfully!`);
+      toast.success(`Candidate ${candidateId ? "updated" : "added"} successfully!`);
 
+      // Reset form
       setFormData({
-        basics: "",
-        hra: "",
         employee_code: "",
         first_name: "",
         last_name: "",
@@ -235,21 +285,21 @@ export default function AddNewCandidate() {
         asset_type: "",
         laptop_company_name: "",
         asset_id: "",
-        upload_documents: "",
       });
       setFile([]);
       navigate("/?tab=onboarding");
     } catch (err) {
-      console.error('Submission error:', err);
-      const errorMessage = err.response?.data?.error ||
+      console.error("Submission error:", err);
+      const errorMessage =
+        err.response?.data?.error ||
         err.response?.data?.message ||
-        err.response?.data ||
+        JSON.stringify(err.response?.data, null, 2) ||
         err.message ||
         "Failed to save candidate";
-      setError(JSON.stringify(errorMessage, null, 2));
-      console.error('Response data:', err.response?.data);
-      console.error('Response status:', err.response?.status);
-      console.error('Response headers:', err.response?.headers);
+      setError(errorMessage);
+      console.error("Response data:", err.response?.data);
+      console.error("Response status:", err.response?.status);
+      console.error("Response headers:", err.response?.headers);
     }
   };
 
@@ -318,7 +368,6 @@ export default function AddNewCandidate() {
       setFilteredRoles([]);
     }
   }, [formData.department, roleList]);
-
 
   return (
     <div className="Add-New-Candidate">
@@ -431,7 +480,6 @@ export default function AddNewCandidate() {
                   ))}
                 </select>
               </div>
-
               <div className="candidate-box">
                 <label htmlFor="gender">Gender</label>
                 <select

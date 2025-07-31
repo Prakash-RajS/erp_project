@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import JSONField
 
 User = get_user_model()
 
@@ -76,10 +78,8 @@ class Profile(models.Model):
     contact_number = models.CharField(max_length=15, blank=True, null=True)
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True)
     branch = models.ForeignKey(Branch, on_delete=models.SET_NULL, null=True, blank=True, related_name='primary_branch')
-    available_branches = models.ManyToManyField(Branch, blank=True, related_name='users')
-    reporting_to = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='subordinates'
-    )
+    available_branches = JSONField(blank=True, default=list)
+    reporting_to = models.CharField(max_length=25, blank=True, null=True)
     employee_id = models.CharField(max_length=50, unique=True, blank=True, null=True)
     reset_token = models.CharField(max_length=32, blank=True, null=True)
     reset_token_expiry = models.DateTimeField(blank=True, null=True)

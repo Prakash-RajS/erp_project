@@ -7,18 +7,34 @@ class BranchSerializer(serializers.ModelSerializer):
         model = Branch
         fields = ['id', 'name']
 
+# class RoleSerializer(serializers.ModelSerializer):
+#     department_id = serializers.IntegerField(source='department.id', read_only=True)
+#     department_name = serializers.CharField(source='department.department_name', read_only=True)
+#     branch_id = serializers.IntegerField(source='branch.id', read_only=True)  # <-- fixed
+#     branch_name = serializers.CharField(source='branch.name', read_only=True)  # <-- fixed
+
+#     class Meta:
+#         model = Role
+#         fields = [
+#             'id', 'role', 'description', 'permissions',
+#             'department', 'department_id', 'department_name',
+#             'branch', 'branch_id', 'branch_name',  # <-- include 'branch'
+#         ]
+        
 class RoleSerializer(serializers.ModelSerializer):
+    department = serializers.PrimaryKeyRelatedField(read_only=True)
+    branch = serializers.PrimaryKeyRelatedField(read_only=True)
     department_id = serializers.IntegerField(source='department.id', read_only=True)
     department_name = serializers.CharField(source='department.department_name', read_only=True)
-    branch_id = serializers.IntegerField(source='branch.id', read_only=True)  # <-- fixed
-    branch_name = serializers.CharField(source='branch.name', read_only=True)  # <-- fixed
+    branch_id = serializers.IntegerField(source='branch.id', read_only=True)
+    branch_name = serializers.CharField(source='branch.name', read_only=True)
 
     class Meta:
         model = Role
         fields = [
             'id', 'role', 'description', 'permissions',
             'department', 'department_id', 'department_name',
-            'branch', 'branch_id', 'branch_name',  # <-- include 'branch'
+            'branch', 'branch_id', 'branch_name',
         ]
         
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -44,7 +60,9 @@ class DepartmentCreateSerializer(serializers.ModelSerializer):
 class ProfileDetailSerializer(serializers.ModelSerializer):
     department = DepartmentSerializer(read_only=True)
     branch = BranchSerializer(read_only=True)
-    available_branches = BranchSerializer(many=True, read_only=True)
+    available_branches = serializers.ListField(
+        child=serializers.CharField(), read_only=True
+    )
     reporting_to = serializers.CharField(source='reporting_to.email', allow_null=True, read_only=True)
     role = RoleSerializer(read_only=True)
 
@@ -58,14 +76,12 @@ class ProfileDetailSerializer(serializers.ModelSerializer):
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), allow_null=True)
     branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all(), allow_null=True)
-    available_branches = serializers.PrimaryKeyRelatedField(
-        queryset=Branch.objects.all(), many=True, required=False
+    available_branches = serializers.ListField(
+        child=serializers.CharField(), required=False
     )
-    reporting_to = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(), allow_null=True, required=False
-    )
+    reporting_to = serializers.CharField(write_only=True, allow_blank=True, required=False)
     role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.all(), allow_null=True)
-    profilePic = serializers.ImageField(allow_empty_file=True, required=False)  # Updated for ImageField
+    profilePic = serializers.ImageField(allow_empty_file=True, required=False)
 
     class Meta:
         model = Profile
@@ -76,12 +92,11 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
     def validate_employee_id(self, value):
         if value:  # Only validate if employee_id is provided
-            # Exclude current instance for updates
             queryset = Profile.objects.exclude(pk=self.instance.pk) if self.instance else Profile.objects.all()
             if queryset.filter(employee_id=value).exists():
                 raise serializers.ValidationError("Employee ID must be unique.")
         return value
-
+    
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileDetailSerializer()
 
@@ -158,22 +173,20 @@ class CreateUserSerializer(serializers.ModelSerializer):
 
         # Create the user
         user = User.objects.create_user(
-            username=validated_data['email'],  # using email as username
+            username=validated_data['email'],
             email=validated_data['email'],
             password=password if password else '',
             first_name=validated_data['first_name'],
             last_name=validated_data.get('last_name', '')
         )
 
-        # Extract and remove M2M field from profile_data
+        # Extract JSONField list from profile data
         available_branches = profile_data.pop('available_branches', [])
 
-        # Create profile (excluding M2M field for now)
+        # Create profile and assign JSON list
         profile = Profile.objects.create(user=user, **profile_data)
-
-        # Set ManyToMany after profile is saved
-        if available_branches:
-            profile.available_branches.set(available_branches)
+        profile.available_branches = available_branches
+        profile.save()
 
         return user
 

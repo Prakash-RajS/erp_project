@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./createUser.css";
+import { toast } from "react-toastify";
+import axios from "axios";
 
 export default function createUser({
   showCreateUser,
@@ -46,22 +48,183 @@ export default function createUser({
   };
   console.log(createUserForm);
 
-  function handleCreateUserSubmit(e) {
+  // function handleCreateUserSubmit(e) {
+  //   e.preventDefault();
+  //   setcreateUserForm({
+  //     first_name: "",
+  //     last_name: "",
+  //     email: "",
+  //     contact_number: "",
+  //     branch: "",
+  //     department: "",
+  //     role: "",
+  //     reporting_to: "",
+  //     available_branches: "",
+  //     employee_id: "",
+  //   });
+  //   setshowCreateUser(false);
+  // }
+  const [branchList, setBranchList] = useState([]);
+  const [departmentList, setDepartmentList] = useState([]);
+  const [roleList, setRoleList] = useState([]);
+
+  useEffect(() => {
+    const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+    const authState = JSON.parse(persistedAuth.auth || "{}");
+    const token = authState?.user?.token;
+
+    const fetchDepartmentsAndRoles = async () => {
+      try {
+        const [deptRes, roleRes] = await Promise.all([
+          axios.get("http://127.0.0.1:8000/api/departments/", {
+            headers: { Authorization: `Token ${token}` },
+          }),
+          axios.get("http://127.0.0.1:8000/api/roles/", {
+            headers: { Authorization: `Token ${token}` },
+          }),
+        ]);
+
+        setDepartmentList(deptRes.data.departments || []);
+        setRoleList(roleRes.data.roles || []);
+      } catch (err) {
+        console.error("Error fetching departments/roles:", err);
+        toast.error("Failed to load dropdown data");
+      }
+    };
+
+    fetchDepartmentsAndRoles();
+  }, []);
+
+  useEffect(() => {
+    const fetchBranches = async () => {
+      const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+      const authState = JSON.parse(persistedAuth.auth || "{}");
+      const token = authState?.user?.token;
+      try {
+        const response = await axios.get("http://127.0.0.1:8000/api/branches/", {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        setBranchList(response.data);
+      } catch (error) {
+        console.error("Error fetching branches:", error);
+        toast.error("Failed to load branches");
+      }
+    };
+
+    fetchBranches();
+  }, []);
+  const handleFormChange = (e) => {
+    const { id, value } = e.target;
+
+    if (
+      [
+        "basics",
+        "hra",
+        "conveyance_allowance",
+        "medical_allowance",
+        "other_allowances",
+        "bonus",
+        "taxes",
+        "pf",
+        "esi",
+        "gross_salary",
+        "net_salary",
+      ].includes(id)
+    ) {
+      setcreateUserForm((prev) => ({ ...prev, [id]: putComma(value) }));
+    } else {
+      setcreateUserForm((prev) => ({ ...prev, [id]: value }));
+    }
+
+    if (id === "department") {
+      const deptId = parseInt(value);
+      const filtered = roleList.filter((role) => role.department === deptId);
+      setFilteredRoles(filtered);
+      setcreateUserForm((prev) => ({ ...prev, designation: "" }));
+    }
+  };
+  const [filteredRoles, setFilteredRoles] = useState([]);
+
+  useEffect(() => {
+    if (createUserForm.department && roleList.length > 0) {
+      const rolesForDept = roleList.filter(
+        (role) => role.department === parseInt(createUserForm.department)
+      );
+      setFilteredRoles(rolesForDept);
+    } else {
+      setFilteredRoles([]);
+    }
+  }, [createUserForm.department, roleList]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setcreateUserForm({
-      first_name: "",
-      last_name: "",
-      email: "",
-      contact_number: "",
-      branch: "",
-      department: "",
-      role: "",
-      reporting_to: "",
-      available_branches: "",
-      employee_id: "",
-    });
-    setshowCreateUser(false);
-  }
+
+    const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+    const authState = JSON.parse(persistedAuth.auth || "{}");
+    const token = authState?.user?.token;
+
+    const formData = {
+      first_name: createUserForm.first_name,
+      last_name: createUserForm.last_name || "",
+      email: createUserForm.email,
+      profile: {
+        phone: createUserForm.phone,
+        role: createUserForm.role,
+        profilePic: createUserForm.profilePic,
+        contact_number: createUserForm.contact_number,
+        department: createUserForm.department,
+        branch: createUserForm.branch,
+        // 🔥 Convert CSV to list
+        available_branches: createUserForm.available_branches
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        reporting_to: createUserForm.reporting_to,
+        employee_id: createUserForm.employee_id,
+      },
+    };
+
+    try {
+      const config = {
+        headers: {
+          Authorization: `Token ${token}`,
+          "Content-Type": "application/json",
+        },
+      };
+
+      const response = await axios.post("http://127.0.0.1:8000/api/users/", formData, config);
+      console.log("User created:", response.data);
+      toast.success("User created successfully");
+      // Reset the form
+      setcreateUserForm({
+        first_name: "",
+        last_name: "",
+        email: "",
+        contact_number: "",
+        branch: "",
+        department: "",
+        role: "",
+        reporting_to: "",
+        available_branches: "",
+        employee_id: "",
+        designation: "",
+      });
+      setedituser({});
+      // Optionally reset form or navigate
+      // setCreateUserForm(initialFormState);
+       navigate("/?tab=manageUsers");
+    } catch (error) {
+      console.error("Error creating user:", error);
+      if (error.response?.data) {
+        toast.error("Failed to create user: " + JSON.stringify(error.response.data));
+      } else {
+        toast.error("Something went wrong");
+      }
+    }
+  };
 
   return (
     <div className="createuser-container">
@@ -80,7 +243,7 @@ export default function createUser({
         <p>{editCreateUser ? "Edit" : "Create New"} Branch Users</p>
       </div>
       <div className="createuser-body">
-        <form onSubmit={handleCreateUserSubmit}>
+        <form onSubmit={handleSubmit}>
           <div className="createuser-content">
             <div className="createuser-box">
               <label htmlFor="first_name">
@@ -148,16 +311,15 @@ export default function createUser({
               <select
                 id="branch"
                 name="branch"
+                className="candidate-input"
+                onChange={handleFormChange}
                 value={createUserForm.branch}
-                onChange={handleCreateUserChange}
                 required
               >
-                <option value="" style={{ color: "hsl(0, 0%, 80%)" }}>
-                  Select Branch
-                </option>
-                {branch.map((ele, ind) => (
-                  <option key={{ ind }} value={ele}>
-                    {ele}
+                <option value="">Select a branch</option>
+                {branchList.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
                   </option>
                 ))}
               </select>
@@ -168,24 +330,18 @@ export default function createUser({
               </label>
               <select
                 id="department"
-                onChange={handleCreateUserChange}
-                value={createUserForm.department}
                 name="department"
+                value={createUserForm.department}
+                onChange={handleFormChange}
+                className="candidate-input"
                 required
               >
-                <option value="" style={{ color: "hsl(0, 0%, 80%)" }}>
-                  Select Department
-                </option>
-                <option value="UI">UI</option>
-                <option value="Sales">Sales</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Admin">Admin</option>
-                <option value="Technicians">Technicians</option>
-                <option value="HR">HR</option>
-                <option value="Purchase">Purchase</option>
-                <option value="Finance">Finance</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Operations">Operations</option>
+                <option value="">Select Department</option>
+                {departmentList.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.department_name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -195,19 +351,19 @@ export default function createUser({
                 role<sup>*</sup>
               </label>
               <select
-                id="role"
-                value={createUserForm.role}
-                onChange={handleCreateUserChange}
-                name="role"
+                id="designation"
+                name="designation"
+                value={createUserForm.designation}
+                onChange={handleFormChange}
+                className="candidate-input"
                 required
               >
-                <option value="" style={{ color: "hsl(0, 0%, 80%)" }}>
-                  Select Role
-                </option>
-                <option value="Super Admin">Super Admin</option>
-                <option value="Admin">Admin</option>
-                <option value="Manager">Manager</option>
-                <option value="User Employee">User Employee</option>
+                <option value="">Select role</option>
+                {filteredRoles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.role}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="createuser-box">
@@ -229,7 +385,7 @@ export default function createUser({
                 id="available_branches"
                 name="available_branches"
                 type="text"
-                placeholder="9134554123"
+                placeholder="e.g., Chennai,Mumbai"
                 value={createUserForm.available_branches}
                 onChange={handleCreateUserChange}
               />
@@ -264,3 +420,4 @@ export default function createUser({
     </div>
   );
 }
+
