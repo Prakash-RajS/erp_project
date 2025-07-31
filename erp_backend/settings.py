@@ -180,13 +180,7 @@ CACHES = {
 }
 
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'  # Example: Use your email provider
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'thestackly@gmail.com'  # Replace with your email
-EMAIL_HOST_PASSWORD = 'nmlg ztvv bryo oajh'  # Use App Password for Gmail
-DEFAULT_FROM_EMAIL = 'thestackly@gmail.com'
+
 
 
 
