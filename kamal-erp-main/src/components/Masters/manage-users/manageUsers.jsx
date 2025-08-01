@@ -2,147 +2,90 @@ import React, { useState, useEffect } from "react";
 import "./manageUsers.css";
 import CreateUser from "../create-user-manageuser/createUser";
 import { toast } from "react-toastify";
+import axios from "axios";
 
 export default function manageUsers() {
   const [manageAPIdata, setmanageAPIdata] = useState({});
   const [tableData, settableDate] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1); // Default: Page 1
-  const rowsPerPage = 10; // Show 10 rows per page
-
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 10;
   const [showCreateUser, setshowCreateUser] = useState(false);
   const [editCreateUser, seteditCreateUser] = useState(false);
   const [edituser, setedituser] = useState({});
 
-  const manageFromAPI = {
-    tableData: [
-      {
-        code: "12",
-        email: "Kmamahhhhhhhhhhhzxcvvh@gmail.com",
-        first_name: "kamalsslivinkishoreharishnaveen",
-        last_name: "Rajsssssss",
-        role: "Super Admin",
-      },
-      {
-        code: "13",
-        email: "Kmamil.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "15",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "14",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "16",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "17",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "18",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "1",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "2",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "3",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "4",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "155",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "122",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "123",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "128",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "129",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-      {
-        code: "1225",
-        email: "Kmama@gmail.com",
-        first_name: "kamal",
-        last_name: "Raj",
-        role: "Super Admin",
-      },
-    ],
-  };
+  // Fetch data from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+      const authState = JSON.parse(persistedAuth.auth || "{}");
+      const token = authState?.user?.token;
+      console.log("Token:", token); // Log token for debugging
+
+      if (!token) {
+        toast.error("No authentication token found. Please log in.");
+        return;
+      }
+
+      try {
+        const response = await axios.get("http://127.0.0.1:8000/api/users/", {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        console.log("API Response:", response.data); // Log response to inspect structure
+
+        // Handle different response structures
+        let users = response.data;
+        if (!Array.isArray(users)) {
+          if (response.data.results && Array.isArray(response.data.results)) {
+            users = response.data.results;
+          } else if (response.data.data && Array.isArray(response.data.data)) {
+            users = response.data.data;
+          } else if (response.data.users && Array.isArray(response.data.users)) {
+            users = response.data.users;
+          } else {
+            throw new Error(
+              `API response is not an array or does not contain results, data, or users: ${JSON.stringify(response.data)}`
+            );
+          }
+        }
+
+        // Map API data to match table structure
+        const formattedData = users.map((user) => ({
+          id: user.id || user.code,
+          code: user.code || user.id,
+          email: user.email,
+          first_name: user.first_name,
+          last_name: user.last_name || "",
+          role: user?.profile?.role?.role || "N/A",
+          profile: {
+            branch: user.profile?.branch?.id || user.profile?.branch || "",
+            department: user.profile?.department?.id || user.profile?.department || "",
+            role: user.profile?.role?.id || user.profile?.role || "",
+            reporting_to: user.profile?.reporting_to?.id || user.profile?.reporting_to || "",
+            contact_number: user.profile?.contact_number || "",
+            employee_id: user.profile?.employee_id || "",
+            available_branches: Array.isArray(user.profile?.available_branches)
+              ? user.profile.available_branches
+              : user.profile?.available_branches
+                ? user.profile.available_branches.split(",").map((item) => item.trim())
+                : [],
+          },
+        }));
+        setmanageAPIdata({ tableData: formattedData });
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        const errorMessage = error.response?.data?.detail || error.message;
+        toast.error(`Failed to load users: ${errorMessage}`);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   useEffect(() => {
-    setmanageAPIdata(manageFromAPI);
-  }, []);
-  useEffect(() => {
     if (Object.keys(manageAPIdata).length > 0) {
-      settableDate(manageAPIdata.tableData);
+      settableDate(manageAPIdata.tableData || []);
     }
   }, [manageAPIdata]);
 
@@ -170,26 +113,49 @@ export default function manageUsers() {
     }
   };
 
-  // delete list
-
-  function deleteTask(ind) {
+  // Delete user
+  const deleteTask = async (ind) => {
     const okDel = window.confirm("Are you sure you want to delete this task?");
     if (okDel) {
-      setmanageAPIdata((prev) => ({
-        ...prev,
-        tableData: prev.tableData.filter((_, index) => index !== ind),
-      }));
-      toast.success("Task deleted!");
+      const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+      const authState = JSON.parse(persistedAuth.auth || "{}");
+      const token = authState?.user?.token;
+
+      if (!token) {
+        toast.error("No authentication token found. Please log in.");
+        return;
+      }
+
+      try {
+        const userId = currentData[ind].id;
+        await axios.delete(`http://127.0.0.1:8000/api/users/${userId}/`, {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        setmanageAPIdata((prev) => ({
+          ...prev,
+          tableData: prev.tableData.filter((_, index) => index !== ind),
+        }));
+        toast.success("User deleted!");
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        const errorMessage = error.response?.data?.detail || error.message;
+        toast.error(`Failed to delete user: ${errorMessage}`);
+      }
     }
-  }
+  };
 
   const showEditUser = (code) => {
-    setedituser(
-      currentData.find((ele) => {
-        return ele.code === code;
-      })
-    );
-    seteditCreateUser(true);
+    const user = currentData.find((ele) => ele.code === code);
+    if (user) {
+      console.log("Edit User:", user); // Log for debugging
+      setedituser(user);
+      seteditCreateUser(true);
+    } else {
+      toast.error("User not found for editing");
+    }
   };
 
   return (
@@ -208,7 +174,7 @@ export default function manageUsers() {
       {editCreateUser && (
         <div className="createuser-btn">
           <CreateUser
-            showCreateUser={showCreateUser}
+            showCreateUser={editCreateUser}
             setshowCreateUser={seteditCreateUser}
             editCreateUser={editCreateUser}
             edituser={edituser}
@@ -217,14 +183,13 @@ export default function manageUsers() {
         </div>
       )}
       <div
-        className={`manageusers-container ${
-          (showCreateUser || editCreateUser) && "blur"
-        }`}
+        className={`manageusers-container ${(showCreateUser || editCreateUser) && "blur"
+          }`}
       >
         <p>Manage Users</p>
         <div className="manage-header">
           <p className="manage-headleft">
-            Efficiently manage and organize user account with easy.
+            Efficiently manage and organize user account with ease.
           </p>
           <div className="manage-headright">
             <div className="manage-search-cointainer">
@@ -239,7 +204,6 @@ export default function manageUsers() {
                 </svg>
               </label>
             </div>
-
             <button onClick={() => setshowCreateUser(true)}>
               + Create New
             </button>
@@ -264,7 +228,7 @@ export default function manageUsers() {
                       <abbr title={ele.email}>
                         {ele.email.length < 18
                           ? ele.email
-                          : ele.email.slice(0, 18) + "..."}
+                          : ele.email.slice(0, 30)}
                       </abbr>
                     </td>
                     <td id="managa-width-firstname">
@@ -282,10 +246,10 @@ export default function manageUsers() {
                       </abbr>
                     </td>
                     <td id="managa-width-role">
-                      <abbr title={ele.role}>
-                        {ele.role.length < 20
+                      <abbr title={String(ele.role)}>
+                        {typeof ele.role === "string" && ele.role.length < 20
                           ? ele.role
-                          : ele.role.slice(0, 20) + "..."}
+                          : String(ele.role).slice(0, 16) + "..."}
                       </abbr>
                     </td>
                     <td id="manage-width-action">

@@ -2,27 +2,16 @@ import React, { useState, useEffect } from "react";
 import "./createUser.css";
 import { toast } from "react-toastify";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
-export default function createUser({
+export default function CreateUser({
   showCreateUser,
   setshowCreateUser,
   editCreateUser,
   edituser,
   setedituser,
 }) {
-  const [ApiManageUser, setApiManageUser] = useState({});
-  const [branch, setBranch] = useState([]);
-  const manageUserFormAi = {
-    branch: ["Chennai", "Mumbai"],
-  };
-  useEffect(() => {
-    setApiManageUser(manageUserFormAi);
-  }, []);
-  useEffect(() => {
-    if (Object.keys(ApiManageUser).length > 0) {
-      setBranch(ApiManageUser.branch);
-    }
-  }, [ApiManageUser]);
+  const navigate = useNavigate();
   const [createUserForm, setcreateUserForm] = useState({
     first_name: "",
     last_name: "",
@@ -35,170 +24,31 @@ export default function createUser({
     available_branches: "",
     employee_id: "",
   });
-  useEffect(() => {
-    setcreateUserForm((prev) => {
-      return { ...prev, ...edituser };
-    });
-  }, [edituser]);
-
-  const handleCreateUserChange = (e) => {
-    setcreateUserForm((prev) => {
-      return { ...prev, [e.target.id]: e.target.value };
-    });
-  };
-  console.log(createUserForm);
-
-  // function handleCreateUserSubmit(e) {
-  //   e.preventDefault();
-  //   setcreateUserForm({
-  //     first_name: "",
-  //     last_name: "",
-  //     email: "",
-  //     contact_number: "",
-  //     branch: "",
-  //     department: "",
-  //     role: "",
-  //     reporting_to: "",
-  //     available_branches: "",
-  //     employee_id: "",
-  //   });
-  //   setshowCreateUser(false);
-  // }
   const [branchList, setBranchList] = useState([]);
   const [departmentList, setDepartmentList] = useState([]);
   const [roleList, setRoleList] = useState([]);
-
-  useEffect(() => {
-    const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
-    const authState = JSON.parse(persistedAuth.auth || "{}");
-    const token = authState?.user?.token;
-
-    const fetchDepartmentsAndRoles = async () => {
-      try {
-        const [deptRes, roleRes] = await Promise.all([
-          axios.get("http://127.0.0.1:8000/api/departments/", {
-            headers: { Authorization: `Token ${token}` },
-          }),
-          axios.get("http://127.0.0.1:8000/api/roles/", {
-            headers: { Authorization: `Token ${token}` },
-          }),
-        ]);
-
-        setDepartmentList(deptRes.data.departments || []);
-        setRoleList(roleRes.data.roles || []);
-      } catch (err) {
-        console.error("Error fetching departments/roles:", err);
-        toast.error("Failed to load dropdown data");
-      }
-    };
-
-    fetchDepartmentsAndRoles();
-  }, []);
-
-  useEffect(() => {
-    const fetchBranches = async () => {
-      const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
-      const authState = JSON.parse(persistedAuth.auth || "{}");
-      const token = authState?.user?.token;
-      try {
-        const response = await axios.get("http://127.0.0.1:8000/api/branches/", {
-          headers: {
-            Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        setBranchList(response.data);
-      } catch (error) {
-        console.error("Error fetching branches:", error);
-        toast.error("Failed to load branches");
-      }
-    };
-
-    fetchBranches();
-  }, []);
-  const handleFormChange = (e) => {
-    const { id, value } = e.target;
-
-    if (
-      [
-        "basics",
-        "hra",
-        "conveyance_allowance",
-        "medical_allowance",
-        "other_allowances",
-        "bonus",
-        "taxes",
-        "pf",
-        "esi",
-        "gross_salary",
-        "net_salary",
-      ].includes(id)
-    ) {
-      setcreateUserForm((prev) => ({ ...prev, [id]: putComma(value) }));
-    } else {
-      setcreateUserForm((prev) => ({ ...prev, [id]: value }));
-    }
-
-    if (id === "department") {
-      const deptId = parseInt(value);
-      const filtered = roleList.filter((role) => role.department === deptId);
-      setFilteredRoles(filtered);
-      setcreateUserForm((prev) => ({ ...prev, designation: "" }));
-    }
-  };
+  const [userList, setUserList] = useState([]);
   const [filteredRoles, setFilteredRoles] = useState([]);
 
+  // Pre-fill form in edit mode
   useEffect(() => {
-    if (createUserForm.department && roleList.length > 0) {
-      const rolesForDept = roleList.filter(
-        (role) => role.department === parseInt(createUserForm.department)
-      );
-      setFilteredRoles(rolesForDept);
+    if (editCreateUser && edituser && Object.keys(edituser).length > 0) {
+      console.log("Pre-filling form with edituser:", edituser);
+      setcreateUserForm({
+        first_name: edituser.first_name || "",
+        last_name: edituser.last_name || "",
+        email: edituser.email || "",
+        contact_number: edituser.profile?.contact_number || "",
+        employee_id: edituser.profile?.employee_id || "",
+        branch: edituser.profile?.branch?.id || edituser.profile?.branch || "",
+        department: edituser.profile?.department?.id || edituser.profile?.department || "",
+        role: edituser.profile?.role.id || edituser.profile?.role || "",
+        reporting_to: edituser.profile?.reporting_to || "",
+        available_branches: Array.isArray(edituser.profile?.available_branches)
+          ? edituser.profile.available_branches.join(", ")
+          : edituser.profile?.available_branches || "",
+      });
     } else {
-      setFilteredRoles([]);
-    }
-  }, [createUserForm.department, roleList]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
-    const authState = JSON.parse(persistedAuth.auth || "{}");
-    const token = authState?.user?.token;
-
-    const formData = {
-      first_name: createUserForm.first_name,
-      last_name: createUserForm.last_name || "",
-      email: createUserForm.email,
-      profile: {
-        phone: createUserForm.phone,
-        role: createUserForm.role,
-        profilePic: createUserForm.profilePic,
-        contact_number: createUserForm.contact_number,
-        department: createUserForm.department,
-        branch: createUserForm.branch,
-        // 🔥 Convert CSV to list
-        available_branches: createUserForm.available_branches
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
-        reporting_to: createUserForm.reporting_to,
-        employee_id: createUserForm.employee_id,
-      },
-    };
-
-    try {
-      const config = {
-        headers: {
-          Authorization: `Token ${token}`,
-          "Content-Type": "application/json",
-        },
-      };
-
-      const response = await axios.post("http://127.0.0.1:8000/api/users/", formData, config);
-      console.log("User created:", response.data);
-      toast.success("User created successfully");
-      // Reset the form
       setcreateUserForm({
         first_name: "",
         last_name: "",
@@ -210,24 +60,169 @@ export default function createUser({
         reporting_to: "",
         available_branches: "",
         employee_id: "",
-        designation: "",
+      });
+    }
+  }, [edituser, editCreateUser]);
+
+  // Fetch branches, departments, roles, and users
+  useEffect(() => {
+    const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+    const authState = JSON.parse(persistedAuth.auth || "{}");
+    const token = authState?.user?.token;
+
+    if (!token) {
+      toast.error("No authentication token found. Please log in.");
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        const [branchRes, deptRes, roleRes, userRes] = await Promise.all([
+          axios.get("http://127.0.0.1:8000/api/branches/", {
+            headers: { Authorization: `Token ${token}` },
+          }),
+          axios.get("http://127.0.0.1:8000/api/departments/", {
+            headers: { Authorization: `Token ${token}` },
+          }),
+          axios.get("http://127.0.0.1:8000/api/roles/", {
+            headers: { Authorization: `Token ${token}` },
+          }),
+          axios.get("http://127.0.0.1:8000/api/users/", {
+            headers: { Authorization: `Token ${token}` },
+          }),
+        ]);
+
+        setBranchList(branchRes.data || []);
+        setDepartmentList(deptRes.data.departments || []);
+        setRoleList(roleRes.data.roles || []);
+
+        // Handle different user response structures
+        let users = userRes.data;
+        if (!Array.isArray(users)) {
+          if (userRes.data.results && Array.isArray(userRes.data.results)) {
+            users = userRes.data.results;
+          } else if (userRes.data.users && Array.isArray(userRes.data.users)) {
+            users = userRes.data.users;
+          } else {
+            console.error("Unexpected user API response:", userRes.data);
+            users = [];
+          }
+        }
+        console.log("Processed userList:", users);
+        setUserList(users);
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        toast.error("Failed to load dropdown data");
+        setUserList([]); // Ensure userList is an array on error
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Filter roles based on selected department
+  useEffect(() => {
+    if (createUserForm.department && roleList.length > 0) {
+      const rolesForDept = roleList.filter(
+        (role) => role.department === parseInt(createUserForm.department)
+      );
+      setFilteredRoles(rolesForDept);
+    } else {
+      setFilteredRoles([]);
+    }
+  }, [createUserForm.department, roleList]);
+
+  const handleFormChange = (e) => {
+    const { id, value } = e.target;
+    setcreateUserForm((prev) => ({ ...prev, [id]: value }));
+
+    if (id === "department") {
+      setcreateUserForm((prev) => ({ ...prev, role: "" }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+    const authState = JSON.parse(persistedAuth.auth || "{}");
+    const token = authState?.user?.token;
+
+    if (!token) {
+      toast.error("No authentication token found. Please log in.");
+      return;
+    }
+
+    const formData = {
+      first_name: createUserForm.first_name,
+      last_name: createUserForm.last_name || "",
+      profile: {
+        contact_number: createUserForm.contact_number || "",
+        branch: createUserForm.branch || null,
+        department: createUserForm.department || null,
+        role: createUserForm.role || null,
+        reporting_to: createUserForm.reporting_to || null,
+        available_branches: createUserForm.available_branches
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      },
+    };
+
+    // Only include email and employee_id for create operations
+    if (!editCreateUser) {
+      formData.email = createUserForm.email;
+      formData.profile.employee_id = createUserForm.employee_id;
+    }
+
+    try {
+      const config = {
+        headers: {
+          Authorization: `Token ${token}`,
+          "Content-Type": "application/json",
+        },
+      };
+
+      let response;
+      if (editCreateUser && edituser.id) {
+        response = await axios.put(
+          `http://127.0.0.1:8000/api/users/${edituser.id}/`,
+          formData,
+          config
+        );
+        toast.success("User updated successfully");
+      } else {
+        formData.password = "defaultPassword123"; // Replace with secure password handling
+        response = await axios.post("http://127.0.0.1:8000/api/users/", formData, config);
+        toast.success("User created successfully");
+      }
+
+      console.log("Response:", response.data);
+      setcreateUserForm({
+        first_name: "",
+        last_name: "",
+        email: "",
+        contact_number: "",
+        branch: "",
+        department: "",
+        role: "",
+        reporting_to: "",
+        available_branches: "",
+        employee_id: "",
       });
       setedituser({});
-      // Optionally reset form or navigate
-      // setCreateUserForm(initialFormState);
-       navigate("/?tab=manageUsers");
+      setshowCreateUser(false);
+      navigate("/?tab=manageUsers");
     } catch (error) {
-      console.error("Error creating user:", error);
-      if (error.response?.data) {
-        toast.error("Failed to create user: " + JSON.stringify(error.response.data));
-      } else {
-        toast.error("Something went wrong");
-      }
+      console.error("Error saving user:", error);
+      const errorMessage = error.response?.data
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      toast.error(`Failed to save user: ${errorMessage}`);
     }
   };
 
   return (
-    <div className="createuser-container">
+    <div className={`createuser-container ${showCreateUser ? "block" : "hidden"}`}>
       <svg
         className="x-logo-createuser"
         xmlns="http://www.w3.org/2000/svg"
@@ -255,7 +250,7 @@ export default function createUser({
                 type="text"
                 placeholder="First Name"
                 value={createUserForm.first_name}
-                onChange={handleCreateUserChange}
+                onChange={handleFormChange}
                 required
               />
             </div>
@@ -269,7 +264,7 @@ export default function createUser({
                 type="text"
                 placeholder="Last Name"
                 value={createUserForm.last_name}
-                onChange={handleCreateUserChange}
+                onChange={handleFormChange}
                 required
               />
             </div>
@@ -285,8 +280,9 @@ export default function createUser({
                 type="email"
                 placeholder="stackly@gmail.com"
                 value={createUserForm.email}
-                onChange={handleCreateUserChange}
+                onChange={handleFormChange}
                 required
+                disabled={editCreateUser}
               />
             </div>
             <div className="createuser-box">
@@ -294,11 +290,10 @@ export default function createUser({
               <input
                 id="contact_number"
                 name="contact_number"
-                className="increment-decrement-createuser"
                 type="number"
                 placeholder="9134554123"
                 value={createUserForm.contact_number}
-                onChange={handleCreateUserChange}
+                onChange={handleFormChange}
               />
             </div>
           </div>
@@ -307,13 +302,12 @@ export default function createUser({
               <label htmlFor="branch">
                 Branch<sup>*</sup>
               </label>
-
               <select
                 id="branch"
                 name="branch"
-                className="candidate-input"
-                onChange={handleFormChange}
                 value={createUserForm.branch}
+                onChange={handleFormChange}
+                className="candidate-input"
                 required
               >
                 <option value="">Select a branch</option>
@@ -348,23 +342,23 @@ export default function createUser({
           <div className="createuser-content">
             <div className="createuser-box">
               <label htmlFor="role">
-                role<sup>*</sup>
+                Role<sup>*</sup>
               </label>
               <select
-                id="designation"
-                name="designation"
-                value={createUserForm.designation}
-                onChange={handleFormChange}
-                className="candidate-input"
-                required
-              >
-                <option value="">Select role</option>
-                {filteredRoles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.role}
-                  </option>
-                ))}
-              </select>
+                  id="role"
+                  name="desigrolenation"
+                  value={createUserForm.role}
+                  onChange={handleFormChange}
+                  className="candidate-input"
+                  required
+                >
+                  <option value="">Select Designation</option>
+                  {filteredRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.role}
+                    </option>
+                  ))}
+                </select>
             </div>
             <div className="createuser-box">
               <label htmlFor="reporting_to">Reporting To</label>
@@ -374,10 +368,12 @@ export default function createUser({
                 type="text"
                 placeholder="9134554123"
                 value={createUserForm.reporting_to}
-                onChange={handleCreateUserChange}
+                onChange={handleFormChange}
               />
             </div>
           </div>
+          
+            
           <div className="createuser-content">
             <div className="createuser-box">
               <label htmlFor="available_branches">Available Branches</label>
@@ -385,9 +381,9 @@ export default function createUser({
                 id="available_branches"
                 name="available_branches"
                 type="text"
-                placeholder="e.g., Chennai,Mumbai"
+                placeholder="e.g., 1,2"
                 value={createUserForm.available_branches}
-                onChange={handleCreateUserChange}
+                onChange={handleFormChange}
               />
             </div>
             <div className="createuser-box">
@@ -397,15 +393,20 @@ export default function createUser({
                 name="employee_id"
                 type="text"
                 placeholder="Enter Employee ID"
-                onChange={handleCreateUserChange}
                 value={createUserForm.employee_id}
+                onChange={handleFormChange}
+                disabled={editCreateUser}
               />
             </div>
           </div>
           <div className="createuser-submit-container">
             <nav>
               <button
-                onClick={() => setshowCreateUser(false)}
+                type="button"
+                onClick={() => {
+                  setshowCreateUser(false);
+                  setedituser({});
+                }}
                 className="createuser-cancel"
               >
                 Cancel
@@ -420,4 +421,3 @@ export default function createUser({
     </div>
   );
 }
-

@@ -62,6 +62,14 @@ export default function CreateNewRole({
     },
   });
 
+  const [createRoleForm, setCreateRoleForm] = useState({
+  role: "",
+  description: "",
+  department: "",
+  branch: "",
+  permissions: {}
+});
+
   useEffect(() => {
   if (editRoleOnly && editRole && Object.keys(editRole).length > 0) {
     const defaultAccess = {
@@ -122,24 +130,58 @@ export default function CreateNewRole({
   }, []);
 
   useEffect(() => {
-    const fetchDepartments = async () => {
-      try {
-        const response = await axios.get("http://127.0.0.1:8000/api/departments/", {
+  const fetchAllDepartmentsAndRoles = async () => {
+    try {
+      // Get token from localStorage
+      const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+      const authState = JSON.parse(persistedAuth.auth || "{}");
+      const token = authState?.user?.token;
+
+      if (!token) throw new Error("No token found");
+
+      // Fetch all paginated departments
+      const allDepartments = [];
+      let page = 1;
+      let totalPages = 1;
+
+      do {
+        const response = await axios.get(
+          `http://127.0.0.1:8000/api/departments/?page=${page}`,
+          {
+            headers: {
+              Authorization: `Token ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const data = response.data;
+        allDepartments.push(...(data.departments || []));
+        totalPages = data.total_pages || 1;
+        page += 1;
+      } while (page <= totalPages);
+
+      // Fetch all roles (only if you need roles here too)
+      const roleResponse = await axios.get(
+        "http://127.0.0.1:8000/api/roles/",
+        {
           headers: {
             Authorization: `Token ${token}`,
             "Content-Type": "application/json",
           },
-        });
-        console.log("Departments fetched:", response.data);
-        setDepartmentList(response.data.departments); // Make sure this is an array
-      } catch (error) {
-        console.error("Error fetching departments:", error);
-        toast.error("Failed to load departments");
-      }
-    };
+        }
+      );
 
-    fetchDepartments();
-  }, []);
+      setDepartmentList(allDepartments);
+      setRoleList(roleResponse.data.roles || []);
+    } catch (error) {
+      console.error("Error fetching departments and roles:", error);
+      toast.error("Failed to load department or role data");
+    }
+  };
+
+  fetchAllDepartmentsAndRoles();
+}, []);
 
 
   const handleResetinputbox = () => {
@@ -316,24 +358,21 @@ export default function CreateNewRole({
             <div className="create-role-box">
               <label htmlFor="department">Select Department<sup>*</sup></label>
               <select
-                id="department"
-                name="department"
-                value={inputRoleAccess.department || ""}
-                onChange={(e) =>
-                  setinputRoleAccess((prev) => ({
-                    ...prev,
-                    department: parseInt(e.target.value), // or e.target.value if your backend accepts string IDs
-                  }))
-                }
-                required
-              >
-                <option value="">Select a department</option>
-                {departmentList.map((dept) => (
-                  <option key={dept.id} value={dept.id}>
-                    {dept.department_name}
-                  </option>
-                ))}
-              </select>
+  id="department"
+  value={formData.department || ""}
+  onChange={(e) =>
+    setFormData((prev) => ({
+      ...prev,
+      department: parseInt(e.target.value), // if backend expects ID
+    }))
+  }
+>
+  {departmentList.map((d) => (
+    <option key={d.id} value={d.id}>
+      {d.department_name}
+    </option>
+  ))}
+</select>
             </div>
 
             <div className="create-role-box">

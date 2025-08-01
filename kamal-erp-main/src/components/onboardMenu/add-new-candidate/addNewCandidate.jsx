@@ -213,8 +213,8 @@ export default function AddNewCandidate() {
       console.log("Files being uploaded:", newFiles.map(f => f.name));
       if (newFiles.length > 0) {
         newFiles.forEach((f) => {
-  formDataToSend.append("upload_documents", f); // append only true File objects
-});
+          formDataToSend.append("upload_documents", f); // append only true File objects
+        });
       }
 
       // Debug: Log FormData contents
@@ -231,15 +231,15 @@ export default function AddNewCandidate() {
 
       const response = candidateId
         ? await axios.put(
-            `http://127.0.0.1:8000/api/onboarding/${candidateId}/`,
-            formDataToSend,
-            config
-          )
+          `http://127.0.0.1:8000/api/onboarding/${candidateId}/`,
+          formDataToSend,
+          config
+        )
         : await axios.post(
-            "http://127.0.0.1:8000/api/onboarding/",
-            formDataToSend,
-            config
-          );
+          "http://127.0.0.1:8000/api/onboarding/",
+          formDataToSend,
+          config
+        );
 
       toast.success(`Candidate ${candidateId ? "updated" : "added"} successfully!`);
 
@@ -303,36 +303,68 @@ export default function AddNewCandidate() {
     }
   };
 
-  const [branchList, setBranchList] = useState([]);
   const [departmentList, setDepartmentList] = useState([]);
   const [roleList, setRoleList] = useState([]);
+  const [filteredRoles, setFilteredRoles] = useState([]);
+  const [branchList, setBranchList] = useState([]);
+ 
 
-  useEffect(() => {
-    const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
-    const authState = JSON.parse(persistedAuth.auth || "{}");
-    const token = authState?.user?.token;
+useEffect(() => {
+  const fetchAllDepartmentsAndRoles = async () => {
+    try {
+      // ✅ Safely get token from localStorage
+      const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+      const authState = persistedAuth?.auth ? JSON.parse(persistedAuth.auth) : {};
+      const token = authState?.user?.token;
 
-    const fetchDepartmentsAndRoles = async () => {
-      try {
-        const [deptRes, roleRes] = await Promise.all([
-          axios.get("http://127.0.0.1:8000/api/departments/", {
-            headers: { Authorization: `Token ${token}` },
-          }),
-          axios.get("http://127.0.0.1:8000/api/roles/", {
-            headers: { Authorization: `Token ${token}` },
-          }),
-        ]);
-
-        setDepartmentList(deptRes.data.departments || []);
-        setRoleList(roleRes.data.roles || []);
-      } catch (err) {
-        console.error("Error fetching departments/roles:", err);
-        toast.error("Failed to load dropdown data");
+      if (!token) {
+        toast.error("Auth token not found");
+        return;
       }
-    };
 
-    fetchDepartmentsAndRoles();
-  }, []);
+      // ✅ Fetch paginated departments
+      const allDepartments = [];
+      let page = 1;
+      let totalPages = 1;
+
+      do {
+        const response = await axios.get(
+          `http://127.0.0.1:8000/api/departments/?page=${page}`,
+          {
+            headers: {
+              Authorization: `Token ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const data = response.data;
+        allDepartments.push(...(data.departments || []));
+        totalPages = data.total_pages || 1;
+        page += 1;
+      } while (page <= totalPages);
+
+      // ✅ Fetch all roles
+      const roleResponse = await axios.get(
+        "http://127.0.0.1:8000/api/roles/",
+        {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      setDepartmentList(allDepartments);
+      setRoleList(roleResponse.data.roles || []);
+    } catch (error) {
+      console.error("Error fetching departments and roles:", error);
+      toast.error("Failed to load departments or roles");
+    }
+  };
+
+  fetchAllDepartmentsAndRoles();
+}, []);
 
   useEffect(() => {
     const fetchBranches = async () => {
@@ -356,7 +388,7 @@ export default function AddNewCandidate() {
     fetchBranches();
   }, []);
 
-  const [filteredRoles, setFilteredRoles] = useState([]);
+ 
 
   useEffect(() => {
     if (formData.department && roleList.length > 0) {
@@ -449,17 +481,18 @@ export default function AddNewCandidate() {
                 <select
                   id="department"
                   name="department"
-                  value={formData.department}
-                  onChange={handleFormChange}
                   className="candidate-input"
+                  value={formData.department || ""}
+                  onChange={handleFormChange}
                   required
                 >
-                  <option value="">Select Department</option>
-                  {departmentList.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.department_name}
-                    </option>
-                  ))}
+                  <option value="">Select a department</option>
+                  {Array.isArray(departmentList) &&
+                    departmentList.map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.department_name}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div className="candidate-box">

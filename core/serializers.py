@@ -22,8 +22,9 @@ class BranchSerializer(serializers.ModelSerializer):
 #         ]
         
 class RoleSerializer(serializers.ModelSerializer):
-    department = serializers.PrimaryKeyRelatedField(read_only=True)
-    branch = serializers.PrimaryKeyRelatedField(read_only=True)
+    department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all())
+    branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all(), allow_null=True)
+
     department_id = serializers.IntegerField(source='department.id', read_only=True)
     department_name = serializers.CharField(source='department.department_name', read_only=True)
     branch_id = serializers.IntegerField(source='branch.id', read_only=True)
@@ -60,10 +61,8 @@ class DepartmentCreateSerializer(serializers.ModelSerializer):
 class ProfileDetailSerializer(serializers.ModelSerializer):
     department = DepartmentSerializer(read_only=True)
     branch = BranchSerializer(read_only=True)
-    available_branches = serializers.ListField(
-        child=serializers.CharField(), read_only=True
-    )
-    reporting_to = serializers.CharField(source='reporting_to.email', allow_null=True, read_only=True)
+    available_branches = serializers.ListField(child=serializers.CharField(), read_only=True)
+    reporting_to = serializers.CharField(allow_null=True, read_only=True)
     role = RoleSerializer(read_only=True)
 
     class Meta:
@@ -76,10 +75,8 @@ class ProfileDetailSerializer(serializers.ModelSerializer):
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all(), allow_null=True)
     branch = serializers.PrimaryKeyRelatedField(queryset=Branch.objects.all(), allow_null=True)
-    available_branches = serializers.ListField(
-        child=serializers.CharField(), required=False
-    )
-    reporting_to = serializers.CharField(write_only=True, allow_blank=True, required=False)
+    available_branches = serializers.ListField(child=serializers.CharField(), required=False)
+    reporting_to = serializers.CharField(allow_null=True, read_only=True)
     role = serializers.PrimaryKeyRelatedField(queryset=Role.objects.all(), allow_null=True)
     profilePic = serializers.ImageField(allow_empty_file=True, required=False)
 
@@ -91,11 +88,16 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate_employee_id(self, value):
-        if value:  # Only validate if employee_id is provided
-            queryset = Profile.objects.exclude(pk=self.instance.pk) if self.instance else Profile.objects.all()
-            if queryset.filter(employee_id=value).exists():
+        if value and self.instance:  # Only validate for updates if value is provided
+            if self.instance.employee_id == value:
+                return value  # Skip uniqueness check for same value
+            if Profile.objects.exclude(pk=self.instance.pk).filter(employee_id=value).exists():
+                raise serializers.ValidationError("Employee ID must be unique.")
+        elif value:  # For creates
+            if Profile.objects.filter(employee_id=value).exists():
                 raise serializers.ValidationError("Employee ID must be unique.")
         return value
+
     
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileDetailSerializer()
@@ -150,6 +152,24 @@ class ManageUserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['code', 'email', 'first_name', 'last_name', 'profile']
 
+    def update(self, instance, validated_data):
+        profile_data = validated_data.pop('profile', {})
+        instance.first_name = validated_data.get('first_name', instance.first_name)
+        instance.last_name = validated_data.get('last_name', instance.last_name)
+        instance.save()
+
+        profile = instance.profile
+        profile.contact_number = profile_data.get('contact_number', profile.contact_number)
+        profile.branch = profile_data.get('branch', profile.branch)
+        profile.department = profile_data.get('department', profile.department)
+        profile.role = profile_data.get('role', profile.role)
+        profile.reporting_to = profile_data.get('reporting_to', profile.reporting_to)
+        profile.available_branches = profile_data.get('available_branches', profile.available_branches)
+        profile.profilePic = profile_data.get('profilePic', profile.profilePic)
+        profile.save()
+
+        return instance
+
 class CreateUserSerializer(serializers.ModelSerializer):
     profile = ProfileUpdateSerializer()
     last_name = serializers.CharField(allow_blank=True, required=False)
@@ -162,16 +182,20 @@ class CreateUserSerializer(serializers.ModelSerializer):
         }
 
     def validate_email(self, value):
-        # Check if a user with this email (username) already exists
-        if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
+        if self.instance:  # Update mode
+            if self.instance.email == value:
+                return value  # Skip uniqueness check for same value
+            if User.objects.exclude(pk=self.instance.pk).filter(username=value).exists():
+                raise serializers.ValidationError("A user with this email already exists.")
+        else:  # Create mode
+            if User.objects.filter(username=value).exists():
+                raise serializers.ValidationError("A user with this email already exists.")
         return value
 
     def create(self, validated_data):
         profile_data = validated_data.pop('profile')
         password = validated_data.pop('password', None)
 
-        # Create the user
         user = User.objects.create_user(
             username=validated_data['email'],
             email=validated_data['email'],
@@ -180,15 +204,30 @@ class CreateUserSerializer(serializers.ModelSerializer):
             last_name=validated_data.get('last_name', '')
         )
 
-        # Extract JSONField list from profile data
         available_branches = profile_data.pop('available_branches', [])
-
-        # Create profile and assign JSON list
         profile = Profile.objects.create(user=user, **profile_data)
         profile.available_branches = available_branches
         profile.save()
 
         return user
+
+    def update(self, instance, validated_data):
+        profile_data = validated_data.pop('profile', {})
+        instance.first_name = validated_data.get('first_name', instance.first_name)
+        instance.last_name = validated_data.get('last_name', instance.last_name)
+        instance.save()
+
+        profile = instance.profile
+        profile.contact_number = profile_data.get('contact_number', profile.contact_number)
+        profile.branch = profile_data.get('branch', profile.branch)
+        profile.department = profile_data.get('department', profile.department)
+        profile.role = profile_data.get('role', profile.role)
+        profile.reporting_to = profile_data.get('reporting_to', profile.reporting_to)
+        profile.available_branches = profile_data.get('available_branches', profile.available_branches)
+        profile.profilePic = profile_data.get('profilePic', profile.profilePic)
+        profile.save()
+
+        return instance
 
 
 

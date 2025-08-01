@@ -51,15 +51,21 @@ class Role(models.Model):
     permissions = models.JSONField(default=dict, blank=True)  # Use generic JSONField
 
     def save(self, *args, **kwargs):
-    # Auto-fill names from foreign keys
-        if self.department:
-            self.department_name = self.department.department_name
+    # Safely try to set department_name from related object
+        if self.department_id:
+            try:
+                self.department_name = self.department.department_name
+                # Auto-fill branch from department if not provided
+                if not self.branch and self.department.branch:
+                    self.branch = self.department.branch
+            except Department.DoesNotExist:
+                pass
 
-            if not self.branch:  # only auto-fill branch if not provided
-                self.branch = self.department.branch
-
-        if self.branch:
-            self.branch_name = self.branch.name
+        if self.branch_id:
+            try:
+                self.branch_name = self.branch.name
+            except Branch.DoesNotExist:
+                pass
 
         super().save(*args, **kwargs)
 

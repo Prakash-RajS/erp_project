@@ -156,7 +156,7 @@ class ProfileView(APIView):
 
     def put(self, request):
         profile = request.user.profile
-        data = request.data.copy()
+        data = request.data.dict()
         password_data = {
             'password': data.pop('password', None),
             'confirm_password': data.pop('confirm_password', None)
@@ -1095,10 +1095,11 @@ class OnboardingListView(APIView):
             )
 
     def post(self, request, format=None):
-        logger.info("Received POST request with data: %s", request.data)
-        logger.info("Received FILES: %s", request.FILES)
+        logger.info("Received POST request with data keys: %s", list(request.data.keys()))
+        logger.info("Received FILES: %s", list(request.FILES.keys()))
 
-        data = request.data.copy()
+        # ✅ Fix: Don't use copy() which tries to deepcopy file objects
+        data = request.data.dict()
         file_paths = []
 
         upload_documents = request.FILES.getlist('upload_documents')
