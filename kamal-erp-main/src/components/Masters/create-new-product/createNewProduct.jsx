@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import "./createNewProduct.css";
 import CategoryInput from "./customInput";
 import CustomCheckboxInput from "./customCheckboxInput";
-import { toast } from "react-toastify";
 import NewproductCategory from "../newproductCategory/newproductCategory";
 import NewproductTaxCode from "../newproduct-tax-code/newproductTaxCode";
 import NewproductUOM from "../newproduct-uom/newproductUOM";
@@ -10,6 +11,7 @@ import NewproductWarehouse from "../newproductWarehouse/newproductWarehouse";
 import NewproductSupplier from "../newproductSupplier/newproductSupplier";
 import NewproductSize from "../newproductSize/newproductSize";
 import NewproductColor from "../newproductColor/newproductColor";
+import axios from "axios";
 
 export default function createNewProduct({
   setshowNewProduct,
@@ -17,9 +19,8 @@ export default function createNewProduct({
   editProduct,
   setEditProduct,
 }) {
-  const [ApiCustomdata, setApiCustomdata] = useState({});
   const [categoryApi, setcategoryApi] = useState([]);
-  const [tax_codeApi, settax_codeAip] = useState([]);
+  const [tax_codeApi, settax_codeApi] = useState([]);
   const [uomApi, setuomApi] = useState([]);
   const [warehouseApi, setwarehouseApi] = useState([]);
   const [sizeApi, setsizeApi] = useState([]);
@@ -27,13 +28,10 @@ export default function createNewProduct({
   const [supplierApi, setsupplierApi] = useState([]);
   const [related_productsApi, setrelated_productsApi] = useState([]);
 
-  // Add new custom box
-
   //tax-code
   const [newproduct_tax_code, setnewproduct_tax_code] = useState(false);
-  const [newproduct_edit_tax_code, setnewproduct_edit_tax_code] =
-    useState(false);
-  //uon
+  const [newproduct_edit_tax_code, setnewproduct_edit_tax_code] = useState(false);
+  //uom
   const [newProductUOM, setnewProductUOM] = useState(false);
   const [editNewproductUOM, seteditNewproductUOM] = useState(false);
   //warehouse
@@ -51,17 +49,22 @@ export default function createNewProduct({
   //category
   const [newproductCategory, setnewproductCategory] = useState(false);
   const [editnewproductCategory, setEditnewproductCategory] = useState(false);
+  //related products
+  const [newrelatedproduct, setnewrelatedproduct] = useState(false);
+  const [editnewrelatedproduct, setEditnewrelatedproduct] = useState(false);
 
   const [newProductImage, setnewProductImage] = useState(true);
   const [imageURL, setImageURL] = useState("");
+  const [imageFile, setImageFile] = useState(null);
 
-  const inputRef = useRef(0);
+  const inputRef = useRef(null);
 
   const handleImageChange = (event) => {
     const file = event.target.files[0];
     if (file) {
       const preview = URL.createObjectURL(file);
-      setImageURL(preview); // Save preview to state
+      setImageURL(preview);
+      setImageFile(file);
       toast.success("Product image uploaded successfully");
       setnewProductImage(false);
     }
@@ -79,8 +82,8 @@ export default function createNewProduct({
   });
 
   const [newProductData, setnewProductData] = useState({
-    product_id: "",
-    product_name: "",
+    id: "",
+    name: "",
     product_type: "",
     description: "",
     category: "",
@@ -103,31 +106,67 @@ export default function createNewProduct({
     sub_category: "",
   });
 
-  const dropDownData = {
-    categoryApi: ["Electronics", "Fashon", "Grocery"],
-    tax_codeApi: ["GST-18%", "no Tax"],
-    uomApi: ["box(12)", "Set(45)"],
-    warehouseApi: ["main Warehouse"],
-    sizeApi: ["small", "large", "medium"],
-    colorApi: ["black", "yellow", "red"],
-    supplierApi: ["abc.pvt.LTD", "qwe.pvt.LTD"],
-    related_productsApi: ["Earbuds", "Bluetooth", "Speaker"],
-  };
   useEffect(() => {
-    setApiCustomdata(dropDownData);
+    const fetchDropdowns = async () => {
+      try {
+        const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+        const authState = JSON.parse(persistedAuth.auth || "{}");
+        const token = authState?.user?.token;
+
+        if (!token) {
+          toast.error("No token found");
+          return;
+        }
+
+        const headers = { Authorization: `Token ${token}` };
+
+        const fetchWithErrorHandling = async (url, field) => {
+          try {
+            const response = await axios.get(url, { headers });
+            return response.data[field] || response.data || [];
+          } catch (err) {
+            console.error(`Error fetching ${field || url}:`, err);
+            toast.error(`Error fetching ${field || url}: ${err.response?.data?.error || err.message}`);
+            return [];
+          }
+        };
+
+        const [
+          categories,
+          taxCodes,
+          uoms,
+          warehouses,
+          sizes,
+          colors,
+          suppliers,
+          products,
+        ] = await Promise.all([
+          fetchWithErrorHandling("http://127.0.0.1:8000/api/categories/", "categories"),
+          fetchWithErrorHandling("http://127.0.0.1:8000/api/tax-codes/", "tax_codes"),
+          fetchWithErrorHandling("http://127.0.0.1:8000/api/uoms/", "uoms"),
+          fetchWithErrorHandling("http://127.0.0.1:8000/api/warehouses/", "warehouses"),
+          fetchWithErrorHandling("http://127.0.0.1:8000/api/sizes/", "sizes"),
+          fetchWithErrorHandling("http://127.0.0.1:8000/api/colors/", "colors"),
+          fetchWithErrorHandling("http://127.0.0.1:8000/api/suppliers/", "suppliers"),
+          fetchWithErrorHandling("http://127.0.0.1:8000/api/products/", "products"),
+        ]);
+
+        setcategoryApi(categories);
+        settax_codeApi(taxCodes);
+        setuomApi(uoms);
+        setwarehouseApi(warehouses);
+        setsizeApi(sizes);
+        setcolorApi(colors);
+        setsupplierApi(suppliers);
+        setrelated_productsApi(products);
+      } catch (err) {
+        console.error("Error fetching dropdowns:", err);
+        toast.error("Error fetching dropdowns: " + (err.response?.data?.error || err.message));
+      }
+    };
+
+    fetchDropdowns();
   }, []);
-  useEffect(() => {
-    if (Object.keys(ApiCustomdata).length > 0) {
-      setcategoryApi(ApiCustomdata.categoryApi);
-      settax_codeAip(ApiCustomdata.tax_codeApi);
-      setuomApi(ApiCustomdata.uomApi);
-      setwarehouseApi(ApiCustomdata.warehouseApi);
-      setsizeApi(ApiCustomdata.sizeApi);
-      setcolorApi(ApiCustomdata.colorApi);
-      setsupplierApi(ApiCustomdata.supplierApi);
-      setrelated_productsApi(ApiCustomdata.related_productsApi);
-    }
-  }, [ApiCustomdata]);
 
   const handleCustomChange = (e) => {
     const { id, value } = e.target;
@@ -146,31 +185,256 @@ export default function createNewProduct({
   };
 
   const handleNewProjectDataChange = (e) => {
-    setnewProductData((prev) => {
-      return { ...prev, [e.target.id]: e.target.value };
-    });
+    setnewProductData((prev) => ({
+      ...prev,
+      [e.target.id]: e.target.value,
+    }));
   };
 
   const handleNewProjectCustomData = (e) => {
-    setnewProductCustom((prev) => {
-      return { ...prev, [e.target.id]: e.target.value };
-    });
+    setnewProductCustom((prev) => ({
+      ...prev,
+      [e.target.id]: e.target.value,
+    }));
   };
 
   useEffect(() => {
-    setnewProductData((prev) => {
-      return { ...prev, ...editProduct };
-    });
-    setnewProductCustom((prev) => {
-      return { ...prev, ...editProduct };
-    });
+    if (editProduct && Object.keys(editProduct).length > 0) {
+      setnewProductData((prev) => ({
+        ...prev,
+        id: editProduct.id || "",
+        name: editProduct.name || "",
+        product_type: editProduct.product_type || "",
+        description: editProduct.description || "",
+        category: editProduct.category || "",
+        tax_code: editProduct.tax_code || "",
+        unit_price: editProduct.unit_price || "",
+        discount: editProduct.discount || "",
+        uom: editProduct.uom || "",
+        quantity: editProduct.quantity || "",
+        stock_level: editProduct.stock_level || "",
+        reorder_level: editProduct.reorder_level || "",
+        warehouse: editProduct.warehouse || "",
+        size: editProduct.size || "",
+        color: editProduct.color || "",
+        weight: editProduct.weight || "",
+        specifications: editProduct.specifications || "",
+        supplier: editProduct.supplier || "",
+        status: editProduct.status || "",
+        product_usage: editProduct.product_usage || "",
+        related_products: editProduct.related_products || [],
+        sub_category: editProduct.sub_category || "",
+      }));
+      setnewProductCustom((prev) => ({
+        ...prev,
+        category: editProduct.custom_category || "",
+        tax_code: editProduct.custom_tax_code || "",
+        uom: editProduct.custom_uom || "",
+        warehouse: editProduct.custom_warehouse || "",
+        size: editProduct.custom_size || "",
+        color: editProduct.custom_color || "",
+        supplier: editProduct.custom_supplier || "",
+        related_products: editProduct.custom_related_products || [],
+      }));
+      if (editProduct.image) {
+        setImageURL(editProduct.image);
+        setnewProductImage(false);
+      }
+    }
   }, [editProduct]);
 
-  function handleNewProductSubmit(e) {
+  const handleNewProductSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+    const authState = JSON.parse(persistedAuth.auth || "{}");
+    const token = authState?.user?.token;
+
+    if (!token) {
+      toast.error("No token found");
+      return;
+    }
+
+    const headers = { Authorization: `Token ${token}` };
+    const formData = new FormData();
+
+    // Map newProductData to serializer fields
+    formData.append("name", newProductData.name);
+    formData.append("product_type", newProductData.product_type);
+    formData.append("description", newProductData.description || "");
+    formData.append("unit_price", newProductData.unit_price || "");
+    formData.append("discount", newProductData.discount || "");
+    formData.append("quantity", newProductData.quantity || "");
+    formData.append("stock_level", newProductData.stock_level || "");
+    formData.append("reorder_level", newProductData.reorder_level || "");
+    formData.append("weight", newProductData.weight || "");
+    formData.append("specifications", newProductData.specifications || "");
+    formData.append("status", newProductData.status);
+    formData.append("product_usage", newProductData.product_usage);
+    formData.append("sub_category", newProductData.sub_category || "");
+
+    // Handle dropdown fields with is_custom and custom_value
+    const dropdownFields = ["category", "tax_code", "uom", "warehouse", "size", "color", "supplier"];
+    const endpointMap = {
+      category: "categories",
+      tax_code: "tax-codes",
+      uom: "uoms",
+      warehouse: "warehouses",
+      size: "sizes",
+      color: "colors",
+      supplier: "suppliers",
+    };
+
+    for (const field of dropdownFields) {
+      if (newProductData[field] === "Custom") {
+        const customValue = newProductcustom[field];
+        if (!customValue) {
+          toast.error(`Custom value for ${field} is required`);
+          return;
+        }
+        try {
+          const response = await axios.post(
+            `http://127.0.0.1:8000/api/${endpointMap[field]}/`,
+            { name: customValue },
+            { headers }
+          );
+          const newId = response.data.id;
+          formData.append(field, newId);
+          formData.append(`is_custom_${field}`, true);
+          formData.append(`custom_${field}`, customValue);
+        } catch (err) {
+          console.error(`Error creating ${field}:`, err);
+          toast.error(`Error creating ${field}: ${err.response?.data?.error || err.message}`);
+          return;
+        }
+      } else {
+        formData.append(field, newProductData[field] || "");
+        formData.append(`is_custom_${field}`, false);
+      }
+    }
+
+    // Handle related_products
+    newProductData.related_products.forEach((id, index) => {
+      formData.append(`related_products[${index}]`, id);
+    });
+
+    // Append image if available
+    if (imageFile) {
+      formData.append("image", imageFile);
+    }
+
+    let response;
+    if (editNewProduct && newProductData.id) {
+      // Update existing product
+      response = await axios.put(
+        `http://127.0.0.1:8000/api/products/${newProductData.id}/`,
+        formData,
+        { headers }
+      );
+      toast.success("Product updated successfully");
+      setTimeout(() => {
+        setnewProductData({
+          id: "",
+          name: "",
+          product_type: "",
+          description: "",
+          category: "",
+          tax_code: "",
+          unit_price: "",
+          discount: "",
+          uom: "",
+          quantity: "",
+          stock_level: "",
+          reorder_level: "",
+          warehouse: "",
+          size: "",
+          color: "",
+          weight: "",
+          specifications: "",
+          supplier: "",
+          status: "",
+          product_usage: "",
+          related_products: [],
+          sub_category: "",
+        });
+        setnewProductCustom({
+          category: "",
+          tax_code: "",
+          uom: "",
+          warehouse: "",
+          size: "",
+          color: "",
+          supplier: "",
+          related_products: [],
+        });
+        setImageURL("");
+        setImageFile(null);
+        setnewProductImage(true);
+        setshowNewProduct(false);
+        setEditProduct({});
+      }, 3000);
+    } else {
+      // Create new product
+      response = await axios.post("http://127.0.0.1:8000/api/products/", formData, { headers });
+      toast.success("Product created successfully");
+      setTimeout(() => {
+        setnewProductData({
+          id: "",
+          name: "",
+          product_type: "",
+          description: "",
+          category: "",
+          tax_code: "",
+          unit_price: "",
+          discount: "",
+          uom: "",
+          quantity: "",
+          stock_level: "",
+          reorder_level: "",
+          warehouse: "",
+          size: "",
+          color: "",
+          weight: "",
+          specifications: "",
+          supplier: "",
+          status: "",
+          product_usage: "",
+          related_products: [],
+          sub_category: "",
+        });
+        setnewProductCustom({
+          category: "",
+          tax_code: "",
+          uom: "",
+          warehouse: "",
+          size: "",
+          color: "",
+          supplier: "",
+          related_products: [],
+        });
+        setImageURL("");
+        setImageFile(null);
+        setnewProductImage(true);
+        setshowNewProduct(false);
+        setEditProduct({});
+      }, 3000);
+    }
+  } catch (err) {
+    console.error("Error submitting product:", err);
+    const errorMsg = err.response?.data
+      ? Object.entries(err.response.data)
+          .map(([key, value]) => `${key}: ${value.join(", ")}`)
+          .join("; ")
+      : err.message;
+    toast.error(`Error ${editNewProduct ? "updating" : "creating"} product: ${errorMsg}`);
+  }
+};
+
+  const handleNewProductReset = (e) => {
     e.preventDefault();
     setnewProductData({
-      product_id: "",
-      product_name: "",
+      id: "",
+      name: "",
       product_type: "",
       description: "",
       category: "",
@@ -189,7 +453,7 @@ export default function createNewProduct({
       supplier: "",
       status: "",
       product_usage: "",
-      related_products: "",
+      related_products: [],
       sub_category: "",
     });
     setnewProductCustom({
@@ -200,52 +464,21 @@ export default function createNewProduct({
       size: "",
       color: "",
       supplier: "",
-      related_products: "",
+      related_products: [],
     });
-    setImageURL([]);
+    setImageURL("");
+    setImageFile(null);
+    setnewProductImage(true);
     setshowNewProduct(false);
-  }
-  function handleNewProductReset(e) {
-    e.preventDefault();
-    setnewProductData({
-      product_id: "",
-      product_name: "",
-      product_type: "",
-      description: "",
-      category: "",
-      tax_code: "",
-      unit_price: "",
-      discount: "",
-      uom: "",
-      quantity: "",
-      stock_level: "",
-      reorder_level: "",
-      warehouse: "",
-      size: "",
-      color: "",
-      weight: "",
-      specifications: "",
-      supplier: "",
-      status: "",
-      product_usage: "",
-    });
-    setnewProductCustom({
-      category: "",
-      tax_code: "",
-      uom: "",
-      warehouse: "",
-      size: "",
-      color: "",
-      supplier: "",
-    });
-    setImageURL([]);
-    setshowNewProduct(false);
-  }
+    setEditProduct({});
+  };
+
   console.log(newProductData);
   console.log(newProductcustom);
 
   return (
     <>
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} />
       {newproductCategory && (
         <div className="product-bg-autoheight-btn">
           <NewproductCategory
@@ -253,7 +486,7 @@ export default function createNewProduct({
             setnewproductCategory={setnewproductCategory}
             editnewproductCategory={editnewproductCategory}
             setEditnewproductCategory={setEditnewproductCategory}
-            editDropDown={dropDownData.categoryApi}
+            editDropDown={categoryApi}
           />
         </div>
       )}
@@ -264,7 +497,7 @@ export default function createNewProduct({
             setnewproductCategory={setnewproductCategory}
             editnewproductCategory={editnewproductCategory}
             setEditnewproductCategory={setEditnewproductCategory}
-            editDropDown={dropDownData.categoryApi}
+            editDropDown={categoryApi}
           />
         </div>
       )}
@@ -275,7 +508,7 @@ export default function createNewProduct({
             setnewproduct_tax_code={setnewproduct_tax_code}
             setnewproduct_edit_tax_code={setnewproduct_edit_tax_code}
             newproduct_edit_tax_code={newproduct_edit_tax_code}
-            editDropDown={dropDownData.tax_codeApi}
+            editDropDown={tax_codeApi}
           />
         </div>
       )}
@@ -286,7 +519,7 @@ export default function createNewProduct({
             setnewproduct_tax_code={setnewproduct_tax_code}
             setnewproduct_edit_tax_code={setnewproduct_edit_tax_code}
             newproduct_edit_tax_code={newproduct_edit_tax_code}
-            editDropDown={dropDownData.tax_codeApi}
+            editDropDown={tax_codeApi}
           />
         </div>
       )}
@@ -297,7 +530,7 @@ export default function createNewProduct({
             setnewProductUOM={setnewProductUOM}
             editNewproductUOM={editNewproductUOM}
             seteditNewproductUOM={seteditNewproductUOM}
-            editDropDown={dropDownData.uomApi}
+            editDropDown={uomApi}
           />
         </div>
       )}
@@ -308,7 +541,7 @@ export default function createNewProduct({
             setnewProductUOM={setnewProductUOM}
             editNewproductUOM={editNewproductUOM}
             seteditNewproductUOM={seteditNewproductUOM}
-            editDropDown={dropDownData.uomApi}
+            editDropDown={uomApi}
           />
         </div>
       )}
@@ -319,7 +552,7 @@ export default function createNewProduct({
             setnewproductWarehouse={setnewproductWarehouse}
             editnewproductWarehouse={editnewproductWarehouse}
             setEditnewproductWarehouse={setEditnewproductWarehouse}
-            editDropDown={dropDownData.warehouseApi}
+            editDropDown={warehouseApi}
           />
         </div>
       )}
@@ -330,7 +563,7 @@ export default function createNewProduct({
             setnewproductWarehouse={setnewproductWarehouse}
             editnewproductWarehouse={editnewproductWarehouse}
             setEditnewproductWarehouse={setEditnewproductWarehouse}
-            editDropDown={dropDownData.warehouseApi}
+            editDropDown={warehouseApi}
           />
         </div>
       )}
@@ -341,7 +574,7 @@ export default function createNewProduct({
             setnewproductSupplier={setnewproductSupplier}
             editnewproductSupplier={editnewproductSupplier}
             setEditnewproductSupplier={setEditnewproductSupplier}
-            editDropDown={dropDownData.supplierApi}
+            editDropDown={supplierApi}
           />
         </div>
       )}
@@ -352,7 +585,7 @@ export default function createNewProduct({
             setnewproductSupplier={setnewproductSupplier}
             editnewproductSupplier={editnewproductSupplier}
             setEditnewproductSupplier={setEditnewproductSupplier}
-            editDropDown={dropDownData.supplierApi}
+            editDropDown={supplierApi}
           />
         </div>
       )}
@@ -363,7 +596,7 @@ export default function createNewProduct({
             setnewproductSize={setnewproductSize}
             editnewproductSize={editnewproductSize}
             setEditnewproductSize={setEditnewproductSize}
-            editDropDown={dropDownData.sizeApi}
+            editDropDown={sizeApi}
           />
         </div>
       )}
@@ -374,7 +607,7 @@ export default function createNewProduct({
             setnewproductSize={setnewproductSize}
             editnewproductSize={editnewproductSize}
             setEditnewproductSize={setEditnewproductSize}
-            editDropDown={dropDownData.sizeApi}
+            editDropDown={sizeApi}
           />
         </div>
       )}
@@ -385,7 +618,7 @@ export default function createNewProduct({
             setnewproductColor={setnewproductColor}
             editnewproductColor={editnewproductColor}
             setEditnewproductColor={setEditnewproductColor}
-            editDropDown={dropDownData.colorApi}
+            editDropDown={colorApi}
           />
         </div>
       )}
@@ -396,14 +629,13 @@ export default function createNewProduct({
             setnewproductColor={setnewproductColor}
             editnewproductColor={editnewproductColor}
             setEditnewproductColor={setEditnewproductColor}
-            editDropDown={dropDownData.colorApi}
+            editDropDown={colorApi}
           />
         </div>
       )}
 
       <div
-        className={`newProduct-container ${
-          (newproduct_tax_code ||
+        className={`newProduct-container ${(newproduct_tax_code ||
             newproduct_edit_tax_code ||
             editNewproductUOM ||
             newProductUOM ||
@@ -418,7 +650,7 @@ export default function createNewProduct({
             newproductCategory ||
             editnewproductCategory) &&
           "product-bg-blur"
-        }`}
+          }`}
       >
         <form onSubmit={handleNewProductSubmit}>
           <div className="newProduct-title">
@@ -493,13 +725,13 @@ export default function createNewProduct({
 
             <div className="createNewProduct-right">
               <div className="createNewProduct-box">
-                <label htmlFor="product_name">
+                <label htmlFor="name">
                   Product Name<sup>*</sup>
                 </label>
                 <input
-                  id="product_name"
+                  id="name"
                   type="text"
-                  value={newProductData.product_name}
+                  value={newProductData.name}
                   onChange={handleNewProjectDataChange}
                   placeholder="Headphones"
                   required
@@ -523,13 +755,13 @@ export default function createNewProduct({
                 </select>
               </div>
               <div className="createNewProduct-box">
-                <label htmlFor="product_id">
+                <label htmlFor="Product ID">
                   Product ID {"(Auto Generate)"}
                 </label>
                 <input
-                  id="product_id"
+                  id="Product ID"
                   type="text"
-                  value={newProductData.product_id}
+                  value={newProductData.id}
                   onChange={handleNewProjectDataChange}
                   placeholder="Auto Generate"
                   disabled
@@ -583,13 +815,13 @@ export default function createNewProduct({
           </div>
           <div className="NewProduct-input-cointainer">
             <div className="newProduct-box">
-              <label or="unit_price">Unit Price</label>
+              <label htmlFor="unit_price">Unit Price</label>
               <input
                 className="increment-decrement-newProduct"
                 type="number"
-                id="price"
+                id="unit_price"
                 placeholder="Enter Price"
-                value={newProductData.price}
+                value={newProductData.unit_price}
                 onChange={handleNewProjectDataChange}
               />
             </div>
@@ -729,7 +961,6 @@ export default function createNewProduct({
             <div className="newProduct-box">
               <label htmlFor="weight">Weight</label>
               <input
-                // className="increment-decrement-newProduct"
                 type="text"
                 id="weight"
                 value={newProductData.weight}
@@ -755,16 +986,30 @@ export default function createNewProduct({
           </div>
           <div className="NewProduct-input-cointainer">
             <div className="newProduct-box">
-              <label htmlFor="size">
+              <label htmlFor="related_products">
                 <p>Related Products</p>
+                <nav onClick={() => setnewrelatedproducts(true)}>
+                  + Add New
+                </nav>
               </label>
-              <CustomCheckboxInput
+              {/* <CustomCheckboxInput
                 setnewProductData={setnewProductData}
                 handleNewProjectCustomData={handleNewProjectCustomData}
                 newProductcustom={newProductcustom}
                 id={"related_products"}
                 customApi={related_productsApi}
-              />
+              /> */}
+              <select
+                id="status"
+                value={newProductData.status}
+                onChange={handleNewProjectDataChange}
+                required
+              >
+                <option value="">Select Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Discontinued">Discontinued</option>
+              </select>
             </div>
             <div className="newProduct-box">
               <label htmlFor="supplier">
@@ -833,15 +1078,13 @@ export default function createNewProduct({
             <button
               className="newProduct-submit-btn"
               type="submit"
-              onClick={() => {
-                setEditProduct({});
-              }}
             >
-              Add Product
+              {editNewProduct ? "Update Product" : "Add Product"}
             </button>
           </div>
         </form>
       </div>
+      <ToastContainer position="top-right" autoClose={3000} />
     </>
   );
 }
