@@ -292,16 +292,14 @@ class ProductSerializer(serializers.ModelSerializer):
     color = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), allow_null=True, required=False)
     supplier = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all(), allow_null=True, required=False)
     related_products = serializers.PrimaryKeyRelatedField(many=True, queryset=Product.objects.all(), required=False)
-    is_custom = serializers.BooleanField(default=False)
-    custom_value = serializers.CharField(required=False, allow_blank=True)
+    
 
     class Meta:
         model = Product
         fields = [
-            'id',  'name', 'product_type', 'description', 'category', 'tax_code', 'unit_price',
+            'id', 'product_id', 'name', 'product_type', 'description', 'category', 'tax_code', 'unit_price',
             'discount', 'uom', 'quantity', 'stock_level', 'reorder_level', 'warehouse', 'size', 'color', 'weight',
             'specifications', 'supplier', 'status', 'product_usage', 'related_products', 'image', 'sub_category',
-            'is_custom', 'custom_value'
         ]
 
     def validate(self, data):

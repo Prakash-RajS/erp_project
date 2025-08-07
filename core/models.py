@@ -149,6 +149,7 @@ class Supplier(models.Model):
         return self.name
 
 class Product(models.Model):
+    product_id = models.CharField(max_length=20, unique=True, editable=False, null=True, blank=True)
     name = models.CharField(max_length=100)
     product_type = models.CharField(max_length=50, choices=[('Goods', 'Goods'), ('Services', 'Services'), ('Combo', 'Combo')])
     description = models.TextField(blank=True)
@@ -171,10 +172,17 @@ class Product(models.Model):
     related_products = models.ManyToManyField('self', blank=True)
     image = models.ImageField(upload_to='product_images/', blank=True, null=True)
     sub_category = models.CharField(max_length=100, blank=True)
-    is_custom = models.BooleanField(default=False)  # Added
-    custom_value = models.CharField(max_length=255, blank=True, null=True)  # Added
+
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None  # check if new instance
+        super().save(*args, **kwargs)  # Save first to get self.id
+        if is_new and not self.product_id:
+            self.product_id = f'CVB{self.id:03d}'
+            Product.objects.filter(pk=self.pk).update(product_id=self.product_id)
+
     
 
 
