@@ -352,7 +352,8 @@
 // }
 import React, { useState, useEffect } from "react";
 import "./products.css";
-import { toast } from "react-toastify";
+import { ToastContainer,  toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
 import CreateNewProduct from "../create-new-product/createNewProduct";
 import ProductImport from "../productImport/productImport";
@@ -490,7 +491,14 @@ export default function products() {
           ...prev,
           product: prev.product.filter((p) => p.id !== id),
         }));
-        toast.success("Product deleted!");
+        toast.success("Product deleted!", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
       } catch (err) {
         console.error("Error deleting product:", err);
         toast.error(`Error deleting product: ${err.response?.data?.error || err.message}`);
@@ -537,7 +545,8 @@ export default function products() {
         status: productData.status || "",
         product_usage: productData.product_usage || "",
         related_products: productData.related_products || [],
-        image: productData.image || "",
+        // image: productData.image || "",
+        image: productData.image ? `http://127.0.0.1:8000/${productData.image}` : "",
         sub_category: productData.sub_category || "",
         custom_category: productData.is_custom_category ? productData.custom_category : "",
         custom_tax_code: productData.is_custom_tax_code ? productData.custom_tax_code : "",
@@ -561,9 +570,20 @@ export default function products() {
     setSelectedStatus("");
     setSelectedProductType("");
   }
-
   return (
     <>
+    <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
       {showNewProduct ? (
         <div className="createNewProduct-btn">
           <CreateNewProduct

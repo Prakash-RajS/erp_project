@@ -284,46 +284,128 @@ class SupplierSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'contact_person', 'phone_number', 'email', 'address']
 
 class ProductSerializer(serializers.ModelSerializer):
-    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), allow_null=True, required=False)
-    tax_code = serializers.PrimaryKeyRelatedField(queryset=TaxCode.objects.all(), allow_null=True, required=False)
-    uom = serializers.PrimaryKeyRelatedField(queryset=UOM.objects.all(), allow_null=True, required=False)
-    warehouse = serializers.PrimaryKeyRelatedField(queryset=Warehouse.objects.all(), allow_null=True, required=False)
-    size = serializers.PrimaryKeyRelatedField(queryset=Size.objects.all(), allow_null=True, required=False)
-    color = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), allow_null=True, required=False)
-    supplier = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all(), allow_null=True, required=False)
-    related_products = serializers.PrimaryKeyRelatedField(many=True, queryset=Product.objects.all(), required=False)
-    
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False, allow_null=True)
+    tax_code = serializers.PrimaryKeyRelatedField(queryset=TaxCode.objects.all(), required=False, allow_null=True)
+    uom = serializers.PrimaryKeyRelatedField(queryset=UOM.objects.all(), required=False, allow_null=True)
+    warehouse = serializers.PrimaryKeyRelatedField(queryset=Warehouse.objects.all(), required=False, allow_null=True)
+    size = serializers.PrimaryKeyRelatedField(queryset=Size.objects.all(), required=False, allow_null=True)
+    color = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), required=False, allow_null=True)
+    supplier = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all(), required=False, allow_null=True)
+    related_products = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+
+    # Custom fields for each dropdown
+    is_custom_category = serializers.BooleanField(default=False, required=False)
+    custom_category = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    is_custom_tax_code = serializers.BooleanField(default=False, required=False)
+    custom_tax_code = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    is_custom_uom = serializers.BooleanField(default=False, required=False)
+    custom_uom = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    is_custom_warehouse = serializers.BooleanField(default=False, required=False)
+    custom_warehouse = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    is_custom_size = serializers.BooleanField(default=False, required=False)
+    custom_size = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    is_custom_color = serializers.BooleanField(default=False, required=False)
+    custom_color = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    is_custom_supplier = serializers.BooleanField(default=False, required=False)
+    custom_supplier = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    is_custom_related_products = serializers.BooleanField(default=False, required=False)
+    custom_related_products = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
     class Meta:
         model = Product
         fields = [
-            'id', 'product_id', 'name', 'product_type', 'description', 'category', 'tax_code', 'unit_price',
-            'discount', 'uom', 'quantity', 'stock_level', 'reorder_level', 'warehouse', 'size', 'color', 'weight',
-            'specifications', 'supplier', 'status', 'product_usage', 'related_products', 'image', 'sub_category',
+            'id', 'product_id', 'name', 'product_type', 'description', 'category', 'is_custom_category',
+            'custom_category', 'tax_code', 'is_custom_tax_code', 'custom_tax_code', 'unit_price',
+            'discount', 'uom', 'is_custom_uom', 'custom_uom', 'quantity', 'stock_level',
+            'reorder_level', 'warehouse', 'is_custom_warehouse', 'custom_warehouse', 'size',
+            'is_custom_size', 'custom_size', 'color', 'is_custom_color', 'custom_color', 'weight',
+            'specifications', 'supplier', 'is_custom_supplier', 'custom_supplier', 'status',
+            'product_usage', 'related_products', 'is_custom_related_products', 'custom_related_products',
+            'image', 'sub_category',
         ]
 
     def validate(self, data):
-        if data.get('is_custom') and not data.get('custom_value'):
-            raise serializers.ValidationError({'custom_value': 'Custom value is required when is_custom is true'})
+        # Make all non-image fields required, except related_products when is_custom_related_products is true
+        required_fields = [
+            'name', 'product_type', 'description', 'unit_price', 'discount', 'quantity',
+            'stock_level', 'reorder_level', 'weight', 'specifications', 'status',
+            'product_usage', 'sub_category'
+        ]
+        for field in required_fields:
+            if field not in data or data[field] is None or data[field] == '':
+                raise serializers.ValidationError({field: f'{field.replace("_", " ").title()} is required'})
+
+        # Validate dropdown fields
+        dropdown_fields = ['category', 'tax_code', 'uom', 'warehouse', 'size', 'color', 'supplier']
+        for field in dropdown_fields:
+            is_custom = data.get(f'is_custom_{field}', False)
+            custom_value = data.get(f'custom_{field}', '')
+            field_value = data.get(field)
+
+            if is_custom:
+                if not custom_value:
+                    raise serializers.ValidationError({
+                        f'custom_{field}': f'Custom {field.replace("_", " ").title()} is required when is_custom_{field} is true'
+                    })
+            else:
+                if field_value is None:
+                    raise serializers.ValidationError({
+                        field: f'{field.replace("_", " ").title()} is required when is_custom_{field} is false'
+                    })
+
+        # Validate related_products
+        is_custom_related_products = data.get('is_custom_related_products', False)
+        custom_related_products = data.get('custom_related_products', '')
+        related_products = data.get('related_products', '')
+
+        if is_custom_related_products:
+            if not custom_related_products:
+                raise serializers.ValidationError({
+                    'custom_related_products': 'Custom Related Products is required when is_custom_related_products is true'
+                })
+        else:
+            if not related_products:
+                raise serializers.ValidationError({
+                    'related_products': 'Related Products is required when is_custom_related_products is false'
+                })
+
         return data
 
     def create(self, validated_data):
-        related_products_data = validated_data.pop('related_products', [])
-        if not validated_data.get('is_custom'):
-            validated_data.pop('custom_value', None)  # Remove if not custom
+        # Pop custom fields
+        custom_fields = {}
+        for field in ['category', 'tax_code', 'uom', 'warehouse', 'size', 'color', 'supplier', 'related_products']:
+            custom_fields[f'is_custom_{field}'] = validated_data.pop(f'is_custom_{field}', False)
+            custom_fields[f'custom_{field}'] = validated_data.pop(f'custom_{field}', '')
+
+        # Create the product
         product = Product.objects.create(**validated_data)
-        if related_products_data:
-            product.related_products.set(related_products_data)
+
+        # Set custom fields
+        for field in ['category', 'tax_code', 'uom', 'warehouse', 'size', 'color', 'supplier', 'related_products']:
+            if custom_fields[f'is_custom_{field}']:
+                setattr(product, f'custom_{field}', custom_fields[f'custom_{field}'])
+            else:
+                setattr(product, f'custom_{field}', '')
+
+        product.save()
         return product
 
     def update(self, instance, validated_data):
-        related_products_data = validated_data.pop('related_products', None)
-        if not validated_data.get('is_custom'):
-            validated_data.pop('custom_value', None)
+        # Pop custom fields
+        custom_fields = {}
+        for field in ['category', 'tax_code', 'uom', 'warehouse', 'size', 'color', 'supplier', 'related_products']:
+            custom_fields[f'is_custom_{field}'] = validated_data.pop(f'is_custom_{field}', False)
+            custom_fields[f'custom_{field}'] = validated_data.pop(f'custom_{field}', '')
+
+        # Update standard fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        if related_products_data is not None:
-            instance.related_products.set(related_products_data)
+
+        # Update custom fields
+        for field in ['category', 'tax_code', 'uom', 'warehouse', 'size', 'color', 'supplier', 'related_products']:
+            setattr(instance, f'custom_{field}', custom_fields[f'custom_{field}'] if custom_fields[f'is_custom_{field}'] else '')
+
         instance.save()
         return instance
     

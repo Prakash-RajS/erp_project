@@ -16,6 +16,7 @@ export default function CreateNewRole({
   const token = authState?.user?.token;
   const [branchList, setBranchList] = useState([]);
   const [departmentList, setDepartmentList] = useState([]);
+  const [roleList, setRoleList] = useState([]);
   
 
   const [inputRoleAccess, setinputRoleAccess] = useState({
@@ -359,9 +360,9 @@ export default function CreateNewRole({
               <label htmlFor="department">Select Department<sup>*</sup></label>
               <select
   id="department"
-  value={formData.department || ""}
+  value={inputRoleAccess.department || ""}
   onChange={(e) =>
-    setFormData((prev) => ({
+    setinputRoleAccess((prev) => ({
       ...prev,
       department: parseInt(e.target.value), // if backend expects ID
     }))

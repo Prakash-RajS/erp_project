@@ -52,14 +52,18 @@ export default function CategoryInput({
   id,
   customApi,
   handleCustomChange,
+  required,
+  multiple,
 }) {
   const [custom, setCustom] = useState(false);
 
   const changeCustom = (e) => {
-    if (e.target.value !== "custom") {
-      handleCustomChange(e);
-    } else {
+    if (e.target.value === "custom") {
       setCustom(true);
+      handleCustomChange({ target: { id, value: "custom" } });
+    } else {
+      setCustom(false);
+      handleCustomChange(e);
     }
   };
 
@@ -71,26 +75,29 @@ export default function CategoryInput({
           type="text"
           placeholder="Enter Custom Input"
           value={newProductcustom?.[id] || ""}
-          onChange={handleNewProjectCustomData}
+          onChange={(e) => {
+            handleNewProjectCustomData(e);
+            handleCustomChange({ target: { id, value: "custom" } });
+          }}
+          required={required}
         />
       ) : (
         <select
           id={id}
-          value={newProductData?.[id] || ""}
+          value={newProductData?.[id] === "custom" ? "" : newProductData?.[id] || ""}
           onChange={changeCustom}
-          required
+          required={required}
+          multiple={multiple}
         >
-          <option value="">Select Option</option>
-
-          {/* Confirm customApi is an array */}
+          <option value="" disabled>
+            Select Option
+          </option>
           {Array.isArray(customApi) &&
             customApi.map((item, idx) => (
               <option key={idx} value={item.id}>
                 {item.name}
               </option>
             ))}
-
-          {/* Custom Option */}
           <option value="custom">Custom</option>
         </select>
       )}

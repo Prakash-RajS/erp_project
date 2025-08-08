@@ -151,25 +151,61 @@ class Supplier(models.Model):
 class Product(models.Model):
     product_id = models.CharField(max_length=20, unique=True, editable=False, null=True, blank=True)
     name = models.CharField(max_length=100)
-    product_type = models.CharField(max_length=50, choices=[('Goods', 'Goods'), ('Services', 'Services'), ('Combo', 'Combo')])
+    product_type = models.CharField(
+        max_length=50,
+        choices=[('Goods', 'Goods'), ('Services', 'Services'), ('Combo', 'Combo')]
+    )
     description = models.TextField(blank=True)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
-    tax_code = models.ForeignKey(TaxCode, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Foreign key + custom text fields
+    category = models.ForeignKey('Category', on_delete=models.SET_NULL, null=True, blank=True)
+    is_custom_category = models.BooleanField(default=False)
+    custom_category = models.CharField(max_length=255, blank=True, null=True)
+
+    tax_code = models.ForeignKey('TaxCode', on_delete=models.SET_NULL, null=True, blank=True)
+    is_custom_tax_code = models.BooleanField(default=False)
+    custom_tax_code = models.CharField(max_length=255, blank=True, null=True)
+
+    uom = models.ForeignKey('UOM', on_delete=models.SET_NULL, null=True, blank=True)
+    is_custom_uom = models.BooleanField(default=False)
+    custom_uom = models.CharField(max_length=255, blank=True, null=True)
+
+    warehouse = models.ForeignKey('Warehouse', on_delete=models.SET_NULL, null=True, blank=True)
+    is_custom_warehouse = models.BooleanField(default=False)
+    custom_warehouse = models.CharField(max_length=255, blank=True, null=True)
+
+    size = models.ForeignKey('Size', on_delete=models.SET_NULL, null=True, blank=True)
+    is_custom_size = models.BooleanField(default=False)
+    custom_size = models.CharField(max_length=255, blank=True, null=True)
+
+    color = models.ForeignKey('Color', on_delete=models.SET_NULL, null=True, blank=True)
+    is_custom_color = models.BooleanField(default=False)
+    custom_color = models.CharField(max_length=255, blank=True, null=True)
+
+    supplier = models.ForeignKey('Supplier', on_delete=models.SET_NULL, null=True, blank=True)
+    is_custom_supplier = models.BooleanField(default=False)
+    custom_supplier = models.CharField(max_length=255, blank=True, null=True)
+
+    related_products = models.CharField(max_length=1000, blank=True)
+    is_custom_related_products = models.BooleanField(default=False)
+    custom_related_products = models.CharField(max_length=255, blank=True, null=True)
+
+    # Other fields
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     discount = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
-    uom = models.ForeignKey(UOM, on_delete=models.SET_NULL, null=True, blank=True)
     quantity = models.IntegerField(default=0)
     stock_level = models.IntegerField(default=0)
     reorder_level = models.IntegerField(default=0)
-    warehouse = models.ForeignKey(Warehouse, on_delete=models.SET_NULL, null=True, blank=True)
-    size = models.ForeignKey(Size, on_delete=models.SET_NULL, null=True, blank=True)
-    color = models.ForeignKey(Color, on_delete=models.SET_NULL, null=True, blank=True)
     weight = models.CharField(max_length=50, blank=True)
     specifications = models.TextField(blank=True)
-    supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True)
-    status = models.CharField(max_length=20, choices=[('Active', 'Active'), ('Inactive', 'Inactive'), ('Discontinued', 'Discontinued')])
-    product_usage = models.CharField(max_length=20, choices=[('Purchase', 'Purchase'), ('Sale', 'Sale'), ('Both', 'Both')])
-    related_products = models.ManyToManyField('self', blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[('Active', 'Active'), ('Inactive', 'Inactive'), ('Discontinued', 'Discontinued')]
+    )
+    product_usage = models.CharField(
+        max_length=20,
+        choices=[('Purchase', 'Purchase'), ('Sale', 'Sale'), ('Both', 'Both')]
+    )
     image = models.ImageField(upload_to='product_images/', blank=True, null=True)
     sub_category = models.CharField(max_length=100, blank=True)
 
@@ -177,8 +213,8 @@ class Product(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None  # check if new instance
-        super().save(*args, **kwargs)  # Save first to get self.id
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
         if is_new and not self.product_id:
             self.product_id = f'CVB{self.id:03d}'
             Product.objects.filter(pk=self.pk).update(product_id=self.product_id)
