@@ -10,7 +10,11 @@ export default function AddNewCandidate() {
   const { candidateId } = useParams();
   const [file, setFile] = useState([]);
   const [error, setError] = useState(null);
-  const [filteredRoleList, setFilteredRoleList] = useState([]);
+  const [departmentList, setDepartmentList] = useState([]);
+  const [roleList, setRoleList] = useState([]);
+  const [filteredRoles, setFilteredRoles] = useState([]);
+  const [branchList, setBranchList] = useState([]);
+
   const [formData, setFormData] = useState({
     employee_code: "",
     first_name: "",
@@ -95,7 +99,6 @@ export default function AddNewCandidate() {
           delete formattedData.upload_documents;
           setFormData(formattedData);
 
-          // Handle existing files for display
           if (data.upload_documents) {
             setFile(
               data.upload_documents.split(",").map((path) => ({
@@ -124,6 +127,103 @@ export default function AddNewCandidate() {
     return val.replace(/,/g, "");
   };
 
+  // Fetch departments and branches
+  useEffect(() => {
+    const fetchDepartmentsAndBranches = async () => {
+      try {
+        const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+        const authState = JSON.parse(persistedAuth.auth || "{}");
+        const token = authState?.user?.token;
+
+        if (!token) {
+          toast.error("Auth token not found");
+          return;
+        }
+
+        // Fetch paginated departments
+        const allDepartments = [];
+        let page = 1;
+        let totalPages = 1;
+
+        do {
+          const response = await axios.get(
+            `http://127.0.0.1:8000/api/departments/?page=${page}`,
+            {
+              headers: {
+                Authorization: `Token ${token}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          const data = response.data;
+          allDepartments.push(...(data.departments || []));
+          totalPages = data.total_pages || 1;
+          page += 1;
+        } while (page <= totalPages);
+
+        // Fetch branches
+        const branchResponse = await axios.get("http://127.0.0.1:8000/api/branches/", {
+          headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        setDepartmentList(allDepartments);
+        setBranchList(branchResponse.data || []);
+      } catch (error) {
+        console.error("Error fetching departments or branches:", error);
+        toast.error("Failed to load departments or branches");
+      }
+    };
+
+    fetchDepartmentsAndBranches();
+  }, []);
+
+  // Fetch roles when department changes
+  useEffect(() => {
+    const fetchRoles = async () => {
+      const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+      const authState = JSON.parse(persistedAuth.auth || "{}");
+      const token = authState?.user?.token;
+
+      if (!token) {
+        toast.error("No authentication token found. Please log in.");
+        return;
+      }
+
+      if (!formData.department) {
+        setRoleList([]);
+        setFilteredRoles([]);
+        return;
+      }
+
+      try {
+        const roleResponse = await axios.get(
+          `http://127.0.0.1:8000/api/roles/?department=${formData.department}`,
+          {
+            headers: {
+              Authorization: `Token ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        console.log("Raw Roles API Response:", roleResponse.data);
+        const roles = Array.isArray(roleResponse.data) ? roleResponse.data : (roleResponse.data.roles || []);
+        setRoleList(roles);
+        setFilteredRoles(roles); // Roles are already filtered by the API
+      } catch (error) {
+        console.error("Error fetching roles:", error);
+        toast.error("Failed to load roles");
+        setRoleList([]);
+        setFilteredRoles([]);
+      }
+    };
+
+    fetchRoles();
+  }, [formData.department]);
+
   const handleFormChange = (e) => {
     const { id, value } = e.target;
 
@@ -148,9 +248,6 @@ export default function AddNewCandidate() {
     }
 
     if (id === "department") {
-      const deptId = parseInt(value);
-      const filtered = roleList.filter((role) => role.department === deptId);
-      setFilteredRoleList(filtered);
       setFormData((prev) => ({ ...prev, designation: "" }));
     }
   };
@@ -186,7 +283,6 @@ export default function AddNewCandidate() {
     try {
       const formDataToSend = new FormData();
 
-      // Append all form fields except upload_documents
       Object.keys(formData).forEach((key) => {
         if (formData[key] !== null && formData[key] !== undefined) {
           const value = [
@@ -208,16 +304,14 @@ export default function AddNewCandidate() {
         }
       });
 
-      // Append new files for upload_documents
       const newFiles = file.filter((f) => f instanceof File);
       console.log("Files being uploaded:", newFiles.map(f => f.name));
       if (newFiles.length > 0) {
         newFiles.forEach((f) => {
-          formDataToSend.append("upload_documents", f); // append only true File objects
+          formDataToSend.append("upload_documents", f);
         });
       }
 
-      // Debug: Log FormData contents
       for (let [key, value] of formDataToSend.entries()) {
         console.log(`FormData entry: ${key}=${typeof value === "object" ? "[File]" : value}`);
       }
@@ -243,7 +337,6 @@ export default function AddNewCandidate() {
 
       toast.success(`Candidate ${candidateId ? "updated" : "added"} successfully!`);
 
-      // Reset form
       setFormData({
         employee_code: "",
         first_name: "",
@@ -302,104 +395,6 @@ export default function AddNewCandidate() {
       console.error("Response headers:", err.response?.headers);
     }
   };
-
-  const [departmentList, setDepartmentList] = useState([]);
-  const [roleList, setRoleList] = useState([]);
-  const [filteredRoles, setFilteredRoles] = useState([]);
-  const [branchList, setBranchList] = useState([]);
- 
-
-useEffect(() => {
-  const fetchAllDepartmentsAndRoles = async () => {
-    try {
-      // ✅ Safely get token from localStorage
-      const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
-      const authState = persistedAuth?.auth ? JSON.parse(persistedAuth.auth) : {};
-      const token = authState?.user?.token;
-
-      if (!token) {
-        toast.error("Auth token not found");
-        return;
-      }
-
-      // ✅ Fetch paginated departments
-      const allDepartments = [];
-      let page = 1;
-      let totalPages = 1;
-
-      do {
-        const response = await axios.get(
-          `http://127.0.0.1:8000/api/departments/?page=${page}`,
-          {
-            headers: {
-              Authorization: `Token ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        const data = response.data;
-        allDepartments.push(...(data.departments || []));
-        totalPages = data.total_pages || 1;
-        page += 1;
-      } while (page <= totalPages);
-
-      // ✅ Fetch all roles
-      const roleResponse = await axios.get(
-        "http://127.0.0.1:8000/api/roles/",
-        {
-          headers: {
-            Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      setDepartmentList(allDepartments);
-      setRoleList(roleResponse.data.roles || []);
-    } catch (error) {
-      console.error("Error fetching departments and roles:", error);
-      toast.error("Failed to load departments or roles");
-    }
-  };
-
-  fetchAllDepartmentsAndRoles();
-}, []);
-
-  useEffect(() => {
-    const fetchBranches = async () => {
-      const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
-      const authState = JSON.parse(persistedAuth.auth || "{}");
-      const token = authState?.user?.token;
-      try {
-        const response = await axios.get("http://127.0.0.1:8000/api/branches/", {
-          headers: {
-            Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        setBranchList(response.data);
-      } catch (error) {
-        console.error("Error fetching branches:", error);
-        toast.error("Failed to load branches");
-      }
-    };
-
-    fetchBranches();
-  }, []);
-
- 
-
-  useEffect(() => {
-    if (formData.department && roleList.length > 0) {
-      const rolesForDept = roleList.filter(
-        (role) => role.department === parseInt(formData.department)
-      );
-      setFilteredRoles(rolesForDept);
-    } else {
-      setFilteredRoles([]);
-    }
-  }, [formData.department, roleList]);
 
   return (
     <div className="Add-New-Candidate">

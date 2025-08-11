@@ -1406,3 +1406,76 @@ class DashboardAttendanceView(APIView):
 
         serializer = DashboardAttendanceSerializer({'dateData': date_data})
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
+from django.core.paginator import Paginator
+from .models import Customer
+from .serializers import CustomerSerializer
+
+class CustomerListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        page = int(request.query_params.get('page', 1))
+        per_page = int(request.query_params.get('per_page', 10))
+        customers = Customer.objects.all().order_by('last_edit_date')
+        paginator = Paginator(customers, per_page)
+        page_obj = paginator.get_page(page)
+        serializer = CustomerSerializer(page_obj, many=True)
+        return Response({
+            'customers': serializer.data,
+            'total_pages': paginator.num_pages,
+            'current_page': page,
+            'total_entries': customers.count(),
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = CustomerSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class CustomerDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            customer = Customer.objects.get(pk=pk)
+            serializer = CustomerSerializer(customer)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Customer.DoesNotExist:
+            return Response({'error': 'Customer not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    def put(self, request, pk):
+        try:
+            customer = Customer.objects.get(pk=pk)
+            serializer = CustomerSerializer(customer, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Customer.DoesNotExist:
+            return Response({'error': 'Customer not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, pk):
+        try:
+            customer = Customer.objects.get(pk=pk)
+            customer.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Customer.DoesNotExist:
+            return Response({'error': 'Customer not found'}, status=status.HTTP_404_NOT_FOUND)
+
+class CustomerSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        customers = Customer.objects.all()
+        summary = {
+            'active': customers.filter(status='Active').count(),
+            'inactive': customers.filter(status='Inactive').count(),
+        }
+        return Response(summary, status=status.HTTP_200_OK)
+    

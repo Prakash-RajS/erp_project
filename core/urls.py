@@ -45,6 +45,9 @@ urlpatterns = [
     path('dashboard/attendance/', views.DashboardAttendanceView.as_view(), name='dashboard-attendance'),
     path('forgot-password/', views.ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/<str:token>/', views.ResetPasswordView.as_view(), name='reset-password'),
+    path('customers/', views.CustomerListView.as_view(), name='customer_list'),
+    path('customers/<int:pk>/', views.CustomerDetailView.as_view(), name='customer_detail'),
+    path('customers/summary/', views.CustomerSummaryView.as_view(), name='customer_summary'),
    
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

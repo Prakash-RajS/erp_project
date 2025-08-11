@@ -496,3 +496,43 @@ class TaskDataSerializer(serializers.Serializer):
 
 class DashboardAttendanceSerializer(serializers.Serializer):
     dateData = serializers.ListField(child=serializers.DictField())
+    
+    
+from .models import Customer
+
+from rest_framework import serializers
+from .models import Customer, Candidate  # Import Onboarding
+
+class CustomerSerializer(serializers.ModelSerializer):
+    assigned_sales_rep = serializers.PrimaryKeyRelatedField(
+        queryset=Candidate.objects.filter(department=6),  # Limit to Sales department employees
+        allow_null=True
+    )
+    customer_id = serializers.CharField(required=False, allow_blank=True)  # Not required for input
+    available_limit = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)  # Allow empty/null, use default
+
+    class Meta:
+        model = Customer
+        fields = [
+            'id', 'first_name', 'last_name', 'customer_type', 'customer_id',
+            'status', 'assigned_sales_rep', 'email', 'phone_number', 'address',
+            'street', 'city', 'state', 'zip_code', 'country', 'company_name',
+            'industry', 'location', 'gst_tax_id', 'credit_limit', 'available_limit',
+            'billing_address', 'shipping_address', 'payment_terms', 'credit_term',
+            'last_edit_date'
+        ]
+
+    def create(self, validated_data):
+        if not validated_data.get('customer_id'):
+            validated_data['customer_id'] = self._generate_customer_id()
+        if 'available_limit' not in validated_data or validated_data['available_limit'] is None:
+            validated_data['available_limit'] = 0.00
+        return super().create(validated_data)
+
+    def _generate_customer_id(self):
+        last_customer = Customer.objects.order_by('-id').first()
+        if last_customer:
+            last_id = int(last_customer.customer_id.replace('CUS', '')) + 1
+        else:
+            last_id = 1
+        return f'CUS{last_id:04d}'

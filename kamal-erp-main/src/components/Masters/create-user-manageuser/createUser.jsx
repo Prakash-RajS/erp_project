@@ -66,71 +66,63 @@ export default function CreateUser({
 
   // Fetch branches, departments, roles, and users
   useEffect(() => {
-    const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
-    const authState = JSON.parse(persistedAuth.auth || "{}");
-    const token = authState?.user?.token;
-
-    if (!token) {
-      toast.error("No authentication token found. Please log in.");
-      return;
+  const persistedAuth = JSON.parse(localStorage.getItem("persist:root") || "{}");
+  const authState = JSON.parse(persistedAuth.auth || "{}");
+  const token = authState?.user?.token;
+  if (!token) {
+    toast.error("No authentication token found. Please log in.");
+    return;
+  }
+  const fetchData = async () => {
+    try {
+      const [branchRes, deptRes, roleRes, userRes] = await Promise.all([
+        axios.get("http://127.0.0.1:8000/api/branches/", {
+          headers: { Authorization: `Token ${token}` },
+        }),
+        axios.get("http://127.0.0.1:8000/api/departments/", {
+          headers: { Authorization: `Token ${token}` },
+        }),
+        axios.get(`http://127.0.0.1:8000/api/roles/${createUserForm.department ? `?department=${createUserForm.department}` : ''}`, {
+          headers: { Authorization: `Token ${token}` },
+        }),
+        axios.get("http://127.0.0.1:8000/api/users/", {
+          headers: { Authorization: `Token ${token}` },
+        }),
+      ]);
+      console.log("Raw Roles API Response:", roleRes.data);
+      setBranchList(branchRes.data || []);
+      setDepartmentList(deptRes.data.departments || []);
+      setRoleList(Array.isArray(roleRes.data) ? roleRes.data : (roleRes.data.roles || []));
+      // ... rest of the code
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      toast.error("Failed to load dropdown data");
+      setUserList([]);
     }
-
-    const fetchData = async () => {
-      try {
-        const [branchRes, deptRes, roleRes, userRes] = await Promise.all([
-          axios.get("http://127.0.0.1:8000/api/branches/", {
-            headers: { Authorization: `Token ${token}` },
-          }),
-          axios.get("http://127.0.0.1:8000/api/departments/", {
-            headers: { Authorization: `Token ${token}` },
-          }),
-          axios.get("http://127.0.0.1:8000/api/roles/", {
-            headers: { Authorization: `Token ${token}` },
-          }),
-          axios.get("http://127.0.0.1:8000/api/users/", {
-            headers: { Authorization: `Token ${token}` },
-          }),
-        ]);
-
-        setBranchList(branchRes.data || []);
-        setDepartmentList(deptRes.data.departments || []);
-        setRoleList(roleRes.data.roles || []);
-
-        // Handle different user response structures
-        let users = userRes.data;
-        if (!Array.isArray(users)) {
-          if (userRes.data.results && Array.isArray(userRes.data.results)) {
-            users = userRes.data.results;
-          } else if (userRes.data.users && Array.isArray(userRes.data.users)) {
-            users = userRes.data.users;
-          } else {
-            console.error("Unexpected user API response:", userRes.data);
-            users = [];
-          }
-        }
-        console.log("Processed userList:", users);
-        setUserList(users);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        toast.error("Failed to load dropdown data");
-        setUserList([]); // Ensure userList is an array on error
-      }
-    };
-
-    fetchData();
-  }, []);
+  };
+  fetchData();
+}, [createUserForm.department]);
 
   // Filter roles based on selected department
-  useEffect(() => {
-    if (createUserForm.department && roleList.length > 0) {
-      const rolesForDept = roleList.filter(
-        (role) => role.department === parseInt(createUserForm.department)
-      );
-      setFilteredRoles(rolesForDept);
-    } else {
-      setFilteredRoles([]);
-    }
-  }, [createUserForm.department, roleList]);
+useEffect(() => {
+  if (createUserForm.department && roleList.length > 0) {
+    const deptId = Number(createUserForm.department);
+    console.log("Selected department ID:", deptId);
+    console.log("All role department values:", roleList.map(r => r.department?.id ?? r.department ?? r.department_id));
+    console.log("Role objects for debugging:", roleList);
+
+    const rolesForDept = roleList.filter(
+      (role) =>
+        (typeof role.department === "object" && role.department?.id === deptId) ||
+        (typeof role.department === "number" && role.department === deptId) ||
+        (role.department_id === deptId) // Fallback to department_id
+    );
+    console.log("Filtered roles:", rolesForDept);
+    setFilteredRoles(rolesForDept);
+  } else {
+    setFilteredRoles([]);
+  }
+}, [createUserForm.department, roleList]);
 
   const handleFormChange = (e) => {
     const { id, value } = e.target;

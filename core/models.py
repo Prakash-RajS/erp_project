@@ -332,3 +332,49 @@ class Task(models.Model):
 
     def __str__(self):
         return self.name
+    
+class Customer(models.Model):from django.db import models
+from .models import  Candidate  # Adjust import to your Onboarding model
+
+class Customer(models.Model):
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100, blank=True)
+    customer_type = models.CharField(max_length=50, choices=[
+        ('Individual', 'Individual'),
+        ('Business', 'Business'),
+        ('Organization', 'Organization'),
+    ])
+    customer_id = models.CharField(max_length=10, unique=True, null=True, blank=True)  # Added blank=True
+    status = models.CharField(max_length=20, choices=[
+        ('Active', 'Active'),
+        ('Inactive', 'Inactive')
+    ])
+    assigned_sales_rep = models.ForeignKey(
+        Candidate,  # Changed to Onboarding (employees/candidates)
+        on_delete=models.SET_NULL,
+        null=True,
+        limit_choices_to={'department': 6}  # Limit to Sales department (ID: 6)
+    )
+    email = models.EmailField(unique=True)
+    phone_number = models.CharField(max_length=15)
+    address = models.TextField(blank=True)
+    street = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100)
+    zip_code = models.CharField(max_length=10)
+    country = models.CharField(max_length=100)
+    company_name = models.CharField(max_length=100, blank=True)
+    industry = models.CharField(max_length=100, blank=True)
+    location = models.CharField(max_length=100, blank=True)
+    gst_tax_id = models.CharField(max_length=20, blank=True)
+    credit_limit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    available_limit = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, blank=True)  # Added blank=True
+    billing_address = models.TextField(blank=True)
+    shipping_address = models.TextField(blank=True)
+    payment_terms = models.CharField(max_length=50, blank=True)
+    credit_term = models.CharField(max_length=50, blank=True)
+    last_edit_date = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} ({self.customer_id})"
+        
