@@ -1407,11 +1407,14 @@ class DashboardAttendanceView(APIView):
         serializer = DashboardAttendanceSerializer({'dateData': date_data})
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+# views.py
+# views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.core.paginator import Paginator
-from .models import Customer
+from django.db.models import Count
+from .models import Customer, Candidate
 from .serializers import CustomerSerializer
 
 class CustomerListView(APIView):
@@ -1478,4 +1481,75 @@ class CustomerSummaryView(APIView):
             'inactive': customers.filter(status='Inactive').count(),
         }
         return Response(summary, status=status.HTTP_200_OK)
+
+class CustomerDuplicatesView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        # Identify duplicates based on first_name and last_name
+        duplicates = (
+            Customer.objects.values('first_name', 'last_name')
+            .annotate(count=Count('id'))
+            .filter(count__gt=1)
+        )
+
+        duplicate_groups = []
+        for item in duplicates:
+            first_name = item['first_name']
+            last_name = item['last_name']
+            matching_customers = Customer.objects.filter(first_name=first_name, last_name=last_name)
+            if matching_customers.count() > 1:
+                primary = matching_customers.order_by('last_edit_date').first()  # Use earliest last_edit_date as primary
+                duplicates = matching_customers.exclude(id=primary.id)
+                serializer = CustomerSerializer(primary)
+                duplicates_serializer = CustomerSerializer(duplicates, many=True)
+                group = {
+                    'primary': serializer.data,
+                    'duplicates': duplicates_serializer.data
+                }
+                duplicate_groups.append(group)
+
+        return Response(duplicate_groups, status=status.HTTP_200_OK)
+
+class CustomerMergeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        primary_id = request.data.get('primary_id')
+        duplicate_ids = request.data.get('duplicate_ids', [])
+
+        if not primary_id or not duplicate_ids:
+            return Response(
+                {'error': 'Primary ID and duplicate IDs are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            primary = Customer.objects.get(id=primary_id)
+            duplicates = Customer.objects.filter(id__in=duplicate_ids)
+
+            if not duplicates.exists():
+                return Response(
+                    {'error': 'No valid duplicates provided'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Merge logic: Keep primary record, delete duplicates
+            serializer = CustomerSerializer(primary)
+            duplicates.delete()
+
+            return Response(
+                {'merged_record': serializer.data},
+                status=status.HTTP_200_OK
+            )
+        except Customer.DoesNotExist:
+            return Response(
+                {'error': 'Primary record or duplicates not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     

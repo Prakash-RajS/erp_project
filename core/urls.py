@@ -48,6 +48,8 @@ urlpatterns = [
     path('customers/', views.CustomerListView.as_view(), name='customer_list'),
     path('customers/<int:pk>/', views.CustomerDetailView.as_view(), name='customer_detail'),
     path('customers/summary/', views.CustomerSummaryView.as_view(), name='customer_summary'),
+    path('customers/duplicates/', views.CustomerDuplicatesView.as_view(), name='customer_duplicates'),
+    path('customers/merge/', views.CustomerMergeView.as_view(), name='customer_merge'),
    
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -333,8 +333,9 @@ class Task(models.Model):
     def __str__(self):
         return self.name
     
-class Customer(models.Model):from django.db import models
-from .models import  Candidate  # Adjust import to your Onboarding model
+from django.db import models
+from .models import Candidate
+  # Adjust import to your Onboarding model
 
 class Customer(models.Model):
     first_name = models.CharField(max_length=100)

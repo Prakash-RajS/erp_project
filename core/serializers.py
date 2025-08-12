@@ -501,7 +501,7 @@ class DashboardAttendanceSerializer(serializers.Serializer):
 from .models import Customer
 
 from rest_framework import serializers
-from .models import Customer, Candidate  # Import Onboarding
+from .models import Customer, Candidate
 
 class CustomerSerializer(serializers.ModelSerializer):
     assigned_sales_rep = serializers.PrimaryKeyRelatedField(

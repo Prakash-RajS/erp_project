@@ -223,9 +223,10 @@ export default function CustomMaster() {
         />
       ) : showCustomDuplicates ? (
         <CustomDuplicates
-          setShowCustomDuplicates={setShowCustomDuplicates}
-          customMaster={apiCustomMaster}
-        />
+        setShowCustomDuplicates={setShowCustomDuplicates}
+        customMaster={apiCustomMaster}
+        setApiCustomMaster={setApiCustomMaster} // Added prop
+      />
       ) : (
         <div className="customMaster-container">
           <div className="customMaster-header">
