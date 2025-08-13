@@ -379,3 +379,68 @@ class Customer(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.customer_id})"
         
+from django.db import models
+from django.utils import timezone
+
+# Define a named function for the default date
+def get_default_po_date():
+    return timezone.now().date()
+
+class PurchaseOrder(models.Model):
+    PO_ID = models.CharField(max_length=20, unique=True, editable=False)
+    PO_date = models.DateField(default=get_default_po_date)  # Use the named function
+    delivery_date = models.DateField()
+    status = models.CharField(
+        max_length=20,
+        choices=[('Draft', 'Draft'), ('Submitted', 'Submitted'), ('Partially Received', 'Partially Received'), 
+                 ('Closed', 'Closed'), ('Canceled', 'Canceled')],
+        default='Draft'
+    )
+    sales_order_reference = models.CharField(max_length=100)
+    supplier = models.ForeignKey('Supplier', on_delete=models.SET_NULL, null=True, blank=True)
+    supplier_name = models.CharField(max_length=100)
+    payment_terms = models.CharField(max_length=50)
+    inco_terms = models.CharField(max_length=50)
+    currency = models.CharField(max_length=10)
+    notes_comments = models.TextField(blank=True)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+    global_discount = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    tax_summary = models.DecimalField(max_digits=10, decimal_places=2)
+    shipping_charges = models.DecimalField(max_digits=10, decimal_places=2)
+    rounding_adjustment = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    total_order_value = models.DecimalField(max_digits=10, decimal_places=2)
+    upload_file_path = models.FileField(upload_to='upload/', blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.PO_ID:
+            last_po = PurchaseOrder.objects.order_by('-id').first()
+            new_id = f'PO-{timezone.now().strftime("%Y%m%d")}-{str(last_po.id + 1).zfill(3) if last_po else "001"}'
+            self.PO_ID = new_id
+        super().save(*args, **kwargs)
+
+class PurchaseOrderItem(models.Model):
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, blank=True)
+    qty_ordered = models.IntegerField()
+    insufficient_stock = models.IntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    tax = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    discount = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def save(self, *args, **kwargs):
+        self.total = self.qty_ordered * self.unit_price * (1 - self.discount/100) * (1 + self.tax/100)
+        super().save(*args, **kwargs)
+
+class PurchaseOrderHistory(models.Model):
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='history')
+    action = models.CharField(max_length=100)
+    performed_by = models.CharField(max_length=100)
+    timestamp = models.DateTimeField(default=timezone.now)
+    details = models.TextField(blank=True)
+
+class PurchaseOrderComment(models.Model):
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='comments')
+    comment = models.TextField(null=True, blank=True)
+    created_by = models.CharField(max_length=100)
+    timestamp = models.DateTimeField(default=timezone.now)

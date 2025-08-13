@@ -536,3 +536,83 @@ class CustomerSerializer(serializers.ModelSerializer):
         else:
             last_id = 1
         return f'CUS{last_id:04d}'
+
+from rest_framework import serializers
+from .models import PurchaseOrder, PurchaseOrderItem, PurchaseOrderHistory, PurchaseOrderComment
+from datetime import datetime  # Add this import
+
+class PurchaseOrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PurchaseOrderItem
+        fields = '__all__'
+        read_only_fields = ('total', 'purchase_order')  # Make purchase_order read-only
+
+class PurchaseOrderHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PurchaseOrderHistory
+        fields = '__all__'
+        read_only_fields = ('purchase_order',)  # Make purchase_order read-only
+
+class PurchaseOrderCommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PurchaseOrderComment
+        fields = '__all__'
+        read_only_fields = ('purchase_order',)  # Make purchase_order read-only
+
+class PurchaseOrderSerializer(serializers.ModelSerializer):
+    items = PurchaseOrderItemSerializer(many=True, required=False)
+    history = PurchaseOrderHistorySerializer(many=True, required=False)
+    comments = PurchaseOrderCommentSerializer(many=True, required=False)
+
+    class Meta:
+        model = PurchaseOrder
+        fields = '__all__'
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # Ensure PO_date is a date string
+        if 'PO_date' in ret and isinstance(ret['PO_date'], datetime):  # Use datetime directly
+            ret['PO_date'] = ret['PO_date'].date()
+        return ret
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        history_data = validated_data.pop('history', [])
+        comments_data = validated_data.pop('comments', [])
+
+        po = PurchaseOrder.objects.create(**validated_data)
+
+        for item_data in items_data:
+            PurchaseOrderItem.objects.create(purchase_order=po, **item_data)
+
+        for history_entry in history_data:
+            PurchaseOrderHistory.objects.create(purchase_order=po, **history_entry)
+
+        for comment_data in comments_data:
+            PurchaseOrderComment.objects.create(purchase_order=po, **comment_data)
+
+        return po
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', [])
+        history_data = validated_data.pop('history', [])
+        comments_data = validated_data.pop('comments', [])
+
+        instance = super().update(instance, validated_data)
+
+        if items_data:
+            instance.items.all().delete()
+            for item_data in items_data:
+                PurchaseOrderItem.objects.create(purchase_order=instance, **item_data)
+
+        if history_data:
+            instance.history.all().delete()
+            for history_entry in history_data:
+                PurchaseOrderHistory.objects.create(purchase_order=instance, **history_entry)
+
+        if comments_data:
+            instance.comments.all().delete()
+            for comment_data in comments_data:
+                PurchaseOrderComment.objects.create(purchase_order=instance, **comment_data)
+
+        return instance

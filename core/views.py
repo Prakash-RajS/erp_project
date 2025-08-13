@@ -1553,3 +1553,59 @@ class CustomerMergeView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.decorators import action  # Added this import
+from .models import PurchaseOrder, PurchaseOrderItem, PurchaseOrderHistory, PurchaseOrderComment
+from .serializers import PurchaseOrderSerializer
+from django.utils import timezone
+from django.core.files.storage import default_storage
+
+class PurchaseOrderViewSet(viewsets.ModelViewSet):
+    queryset = PurchaseOrder.objects.all()
+    serializer_class = PurchaseOrderSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        if 'upload_file_path' in self.request.FILES:
+            file = self.request.FILES['upload_file_path']
+            file_path = default_storage.save(f'uploads/{file.name}', file)
+            instance.upload_file_path = file_path
+            instance.save()
+
+    @action(detail=True, methods=['post'])
+    def add_comment(self, request, pk=None):
+        purchase_order = self.get_object()
+        serializer = PurchaseOrderCommentSerializer(data={
+            'purchase_order': purchase_order.id,
+            'comment': request.data.get('comment'),
+            'created_by': request.user.username if request.user.is_authenticated else 'Anonymous'
+        })
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def submit_draft(self, request, pk=None):
+        purchase_order = self.get_object()
+        if purchase_order.status == 'Draft':
+            purchase_order.status = 'Submitted'
+            purchase_order.save()
+            PurchaseOrderHistory.objects.create(
+                purchase_order=purchase_order,
+                action='Submitted',
+                performed_by=request.user.username if request.user.is_authenticated else 'Anonymous',
+                details=f'Submitted at {timezone.now()}'
+            )
+            serializer = self.get_serializer(purchase_order)
+            return Response(serializer.data)
+        return Response({'error': 'Only drafts can be submitted'}, status=status.HTTP_400_BAD_REQUEST)

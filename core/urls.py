@@ -50,7 +50,7 @@ urlpatterns = [
     path('customers/summary/', views.CustomerSummaryView.as_view(), name='customer_summary'),
     path('customers/duplicates/', views.CustomerDuplicatesView.as_view(), name='customer_duplicates'),
     path('customers/merge/', views.CustomerMergeView.as_view(), name='customer_merge'),
-   
+   path('purchase-orders/', views.PurchaseOrderViewSet.as_view({'get': 'list', 'post': 'create'}), name='purchase-order-list'),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
